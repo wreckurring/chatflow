@@ -1,0 +1,12 @@
+spring:
+  application:
+    name: chatflow
+
+server:
+  port: 8080
+
+# App metadata
+app:
+  name: ChatFlow
+  version: 0.1.0
+  author: Mohit Kumar
