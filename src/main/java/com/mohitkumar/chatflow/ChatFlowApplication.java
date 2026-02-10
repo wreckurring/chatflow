@@ -2,14 +2,10 @@ package com.mohitkumar.chatflow;
 
 import org.springframework.boot.SpringApplication;
 import org.springframework.boot.autoconfigure.SpringBootApplication;
+import org.springframework.data.jpa.repository.config.EnableJpaAuditing;
 
-/**
- * ChatFlow - Real-time Chat Application
- * 
- * @author Mohit Kumar
- * @version 0.1.0
- */
 @SpringBootApplication
+@EnableJpaAuditing
 public class ChatFlowApplication {
 
     public static void main(String[] args) {
