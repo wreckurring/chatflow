@@ -72,7 +72,7 @@ chatflow/
 
 - [x] Project setup
 - [x] User authentication
-- [ ] Room management
+- [x] Room management
 - [ ] WebSocket messaging
 - [ ] Redis integration
 - [ ] Advanced features
