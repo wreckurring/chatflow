@@ -1,7 +1,6 @@
 package com.mohitkumar.chatflow.model;
 
 import jakarta.persistence.*;
-import jakarta.validation.constraints.Email;
 import jakarta.validation.constraints.NotBlank;
 import lombok.*;
 import org.springframework.data.annotation.CreatedDate;
@@ -12,14 +11,14 @@ import java.util.HashSet;
 import java.util.Set;
 
 @Entity
-@Table(name = "users")
+@Table(name = "rooms")
 @Getter
 @Setter
 @NoArgsConstructor
 @AllArgsConstructor
 @Builder
 @EntityListeners(AuditingEntityListener.class)
-public class User {
+public class Room {
 
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
@@ -27,36 +26,35 @@ public class User {
 
     @NotBlank
     @Column(unique = true, nullable = false)
-    private String username;
+    private String name;
 
-    @Email
-    @NotBlank
-    @Column(unique = true, nullable = false)
-    private String email;
+    @Column(length = 255)
+    private String description;
 
-    @NotBlank
-    @Column(nullable = false)
-    private String password;
-
-    // display name can be different from username
-    @Column(name = "display_name")
-    private String displayName;
-
+    // public rooms anyone can join, private needs invite
     @Enumerated(EnumType.STRING)
     @Column(nullable = false)
     @Builder.Default
-    private Status status = Status.OFFLINE;
+    private RoomType type = RoomType.PUBLIC;
 
-    // rooms this user has joined
-    @ManyToMany(mappedBy = "members", fetch = FetchType.LAZY)
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "created_by", nullable = false)
+    private User createdBy;
+
+    @ManyToMany(fetch = FetchType.LAZY)
+    @JoinTable(
+        name = "room_members",
+        joinColumns = @JoinColumn(name = "room_id"),
+        inverseJoinColumns = @JoinColumn(name = "user_id")
+    )
     @Builder.Default
-    private Set<Room> rooms = new HashSet<>();
+    private Set<User> members = new HashSet<>();
 
     @CreatedDate
     @Column(name = "created_at", updatable = false)
     private LocalDateTime createdAt;
 
-    public enum Status {
-        ONLINE, OFFLINE, AWAY
+    public enum RoomType {
+        PUBLIC, PRIVATE
     }
 }
