@@ -71,7 +71,7 @@ chatflow/
 ## Development Roadmap
 
 - [x] Project setup
-- [ ] User authentication
+- [x] User authentication
 - [ ] Room management
 - [ ] WebSocket messaging
 - [ ] Redis integration
