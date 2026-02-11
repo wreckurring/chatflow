@@ -14,7 +14,7 @@
 
     <groupId>com.mohitkumar</groupId>
     <artifactId>chatflow</artifactId>
-    <version>0.1.0</version>
+    <version>1.0.0</version>
     <n>ChatFlow</n>
     <description>Real-time chat application</description>
 
@@ -44,6 +44,12 @@
             <groupId>org.postgresql</groupId>
             <artifactId>postgresql</artifactId>
             <scope>runtime</scope>
+        </dependency>
+
+        <!-- Redis -->
+        <dependency>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-starter-data-redis</artifactId>
         </dependency>
 
         <!-- Spring Security -->

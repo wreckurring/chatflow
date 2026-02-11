@@ -17,6 +17,12 @@ spring:
         dialect: org.hibernate.dialect.PostgreSQLDialect
         format_sql: true
 
+  data:
+    redis:
+      host: localhost
+      port: 6379
+      timeout: 60000ms
+
 server:
   port: 8080
 
@@ -28,5 +34,5 @@ jwt:
 # App metadata
 app:
   name: ChatFlow
-  version: 0.1.0
+  version: 1.0.0
   author: Mohit Kumar

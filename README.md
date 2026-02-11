@@ -17,7 +17,7 @@ Real-time chat application built with Spring Boot, WebSockets, Redis, and Postgr
 - [x] Room management (create, join, leave, search)
 - [x] Real-time messaging with WebSockets (STOMP)
 - [x] Message history with pagination
-- [ ] Online presence tracking (Redis)
+- [x] Online presence tracking with Redis
 - [ ] Typing indicators
 - [ ] Docker deployment
 
@@ -45,35 +45,20 @@ Real-time chat application built with Spring Boot, WebSockets, Redis, and Postgr
 |--------|----------|-------------|
 | GET | /api/messages/room/{id} | Get message history |
 
+### Presence
+| Method | Endpoint | Description |
+|--------|----------|-------------|
+| GET | /api/presence/online | Get all online users |
+| GET | /api/presence/check/{username} | Check if user is online |
+
 ### WebSocket
 | Destination | Description |
 |-------------|-------------|
 | CONNECT /ws | Connect with JWT in Authorization header |
 | SEND /app/chat.send | Send a message to a room |
 | SEND /app/chat.join | Notify room you joined |
+| SEND /app/chat.leave | Notify room you left |
 | SUBSCRIBE /topic/room/{id} | Receive messages in a room |
-
-## WebSocket Usage Example
-
-```javascript
-// Connect
-const socket = new SockJS('http://localhost:8080/ws');
-const stompClient = Stomp.over(socket);
-
-stompClient.connect({ Authorization: 'Bearer ' + token }, () => {
-
-    // Subscribe to a room
-    stompClient.subscribe('/topic/room/1', (message) => {
-        console.log(JSON.parse(message.body));
-    });
-
-    // Send a message
-    stompClient.send('/app/chat.send', {}, JSON.stringify({
-        roomId: 1,
-        content: 'Hello everyone!'
-    }));
-});
-```
 
 ## Getting Started
 
@@ -82,11 +67,15 @@ stompClient.connect({ Authorization: 'Bearer ' + token }, () => {
 - Java 17+
 - Maven 3.6+
 - PostgreSQL 14+
+- Redis 6+
 
 ### Setup
 
 ```bash
-# Create database
+# Start Redis (if using Docker)
+docker run -d -p 6379:6379 redis:latest
+
+# Create PostgreSQL database
 psql -U postgres -c "CREATE DATABASE chatflow;"
 
 # Clone and run
@@ -96,13 +85,50 @@ mvn clean install
 mvn spring-boot:run
 ```
 
+### WebSocket Example
+
+```javascript
+const socket = new SockJS('http://localhost:8080/ws');
+const stompClient = Stomp.over(socket);
+
+stompClient.connect({ Authorization: 'Bearer ' + token }, () => {
+
+    // Subscribe to a room
+    stompClient.subscribe('/topic/room/1', (message) => {
+        const msg = JSON.parse(message.body);
+        console.log(msg);
+    });
+
+    // Join room
+    stompClient.send('/app/chat.join', {}, JSON.stringify({ roomId: 1 }));
+
+    // Send message
+    stompClient.send('/app/chat.send', {}, JSON.stringify({
+        roomId: 1,
+        content: 'Hello!'
+    }));
+});
+```
+
+## Architecture
+
+```
+Frontend (React/JS)
+    ↓
+Spring Boot Backend
+    ├── REST API (Auth, Rooms, Messages)
+    ├── WebSocket (Real-time chat)
+    ├── PostgreSQL (Persistent data)
+    └── Redis (Online presence, caching)
+```
+
 ## Development Roadmap
 
 - [x] Project setup
 - [x] User authentication (JWT)
 - [x] Room management
 - [x] WebSocket real-time messaging
-- [ ] Redis online presence
+- [x] Redis online presence
 - [ ] Typing indicators
 - [ ] Docker deployment
 
