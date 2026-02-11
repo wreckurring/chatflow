@@ -5,83 +5,107 @@ Real-time chat application built with Spring Boot, WebSockets, Redis, and Postgr
 ## Tech Stack
 
 - **Backend:** Spring Boot 3.2.2, Java 17
-- **WebSocket:** STOMP protocol
+- **WebSocket:** STOMP over SockJS
 - **Database:** PostgreSQL
 - **Cache:** Redis
 - **Security:** JWT Authentication
 - **Build Tool:** Maven
 
-## Features (Planned)
+## Features
 
-- [ ] User authentication with JWT
-- [ ] Real-time messaging with WebSockets
-- [ ] Multiple chat rooms
-- [ ] Direct messaging
-- [ ] Online presence tracking
-- [ ] Message history
+- [x] User authentication with JWT
+- [x] Room management (create, join, leave, search)
+- [x] Real-time messaging with WebSockets (STOMP)
+- [x] Message history with pagination
+- [ ] Online presence tracking (Redis)
 - [ ] Typing indicators
-- [ ] File sharing
 - [ ] Docker deployment
+
+## API Endpoints
+
+### Auth
+| Method | Endpoint | Description |
+|--------|----------|-------------|
+| POST | /api/auth/register | Register new user |
+| POST | /api/auth/login | Login and get JWT |
+
+### Rooms
+| Method | Endpoint | Description |
+|--------|----------|-------------|
+| POST | /api/rooms | Create a room |
+| GET | /api/rooms | Get public rooms |
+| GET | /api/rooms/{id} | Get room by ID |
+| GET | /api/rooms/search?q= | Search rooms |
+| GET | /api/rooms/my-rooms | My joined rooms |
+| POST | /api/rooms/{id}/join | Join a room |
+| DELETE | /api/rooms/{id}/leave | Leave a room |
+
+### Messages
+| Method | Endpoint | Description |
+|--------|----------|-------------|
+| GET | /api/messages/room/{id} | Get message history |
+
+### WebSocket
+| Destination | Description |
+|-------------|-------------|
+| CONNECT /ws | Connect with JWT in Authorization header |
+| SEND /app/chat.send | Send a message to a room |
+| SEND /app/chat.join | Notify room you joined |
+| SUBSCRIBE /topic/room/{id} | Receive messages in a room |
+
+## WebSocket Usage Example
+
+```javascript
+// Connect
+const socket = new SockJS('http://localhost:8080/ws');
+const stompClient = Stomp.over(socket);
+
+stompClient.connect({ Authorization: 'Bearer ' + token }, () => {
+
+    // Subscribe to a room
+    stompClient.subscribe('/topic/room/1', (message) => {
+        console.log(JSON.parse(message.body));
+    });
+
+    // Send a message
+    stompClient.send('/app/chat.send', {}, JSON.stringify({
+        roomId: 1,
+        content: 'Hello everyone!'
+    }));
+});
+```
 
 ## Getting Started
 
 ### Prerequisites
 
-- Java 17 or higher
+- Java 17+
 - Maven 3.6+
 - PostgreSQL 14+
-- Redis 6+
 
-### Installation
+### Setup
 
 ```bash
-# Clone the repository
+# Create database
+psql -U postgres -c "CREATE DATABASE chatflow;"
+
+# Clone and run
 git clone https://github.com/wreckurring/chatflow.git
 cd chatflow
-
-# Build the project
 mvn clean install
-
-# Run the application
 mvn spring-boot:run
-```
-
-The application will start on `http://localhost:8080`
-
-## Project Structure
-
-```
-chatflow/
-├── src/
-│   ├── main/
-│   │   ├── java/com/mohitkumar/chatflow/
-│   │   │   ├── config/          # Configuration classes
-│   │   │   ├── controller/      # REST controllers
-│   │   │   ├── model/           # JPA entities
-│   │   │   ├── repository/      # Data access layer
-│   │   │   ├── service/         # Business logic
-│   │   │   ├── security/        # JWT & Security
-│   │   │   └── dto/             # Data transfer objects
-│   │   └── resources/
-│   │       └── application.yml  # Configuration
-│   └── test/                    # Unit tests
-└── pom.xml                      # Maven dependencies
 ```
 
 ## Development Roadmap
 
 - [x] Project setup
-- [x] User authentication
+- [x] User authentication (JWT)
 - [x] Room management
-- [ ] WebSocket messaging
-- [ ] Redis integration
-- [ ] Advanced features
+- [x] WebSocket real-time messaging
+- [ ] Redis online presence
+- [ ] Typing indicators
 - [ ] Docker deployment
 
 ## License
 
-MIT License - feel free to use this project for learning!
-
----
-
-⭐ Star this repository if you find it helpful!
+MIT License

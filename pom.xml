@@ -15,7 +15,7 @@
     <groupId>com.mohitkumar</groupId>
     <artifactId>chatflow</artifactId>
     <version>0.1.0</version>
-    <name>ChatFlow</name>
+    <n>ChatFlow</n>
     <description>Real-time chat application</description>
 
     <properties>
@@ -27,6 +27,12 @@
         <dependency>
             <groupId>org.springframework.boot</groupId>
             <artifactId>spring-boot-starter-web</artifactId>
+        </dependency>
+
+        <!-- WebSocket -->
+        <dependency>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-starter-websocket</artifactId>
         </dependency>
 
         <!-- JPA + PostgreSQL -->
