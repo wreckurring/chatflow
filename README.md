@@ -1,137 +1,125 @@
 # ChatFlow
 
-Real-time chat application built with Spring Boot, WebSockets, Redis, and PostgreSQL.
+A real-time chat system built to explore WebSocket architecture, Redis presence tracking, and secure multi-tenant messaging patterns.
+
+![Java](https://img.shields.io/badge/Java-17-orange.svg)
+![Spring Boot](https://img.shields.io/badge/Spring%20Boot-3.2.2-green.svg)
+
+---
+
+## Key Features
+
+- **JWT Authentication** - Stateless auth with bcrypt password hashing
+- **Real-time Messaging** - WebSocket (STOMP) pub/sub with room-based fan-out
+- **Room Management** - Multi-tenant chat rooms with access control
+- **Distributed Presence** - Redis-backed online user tracking with TTL heartbeat
+- **Message Persistence** - Paginated history with indexed PostgreSQL queries
 
 ## Tech Stack
 
-- **Backend:** Spring Boot 3.2.2, Java 17
-- **WebSocket:** STOMP over SockJS
-- **Database:** PostgreSQL
-- **Cache:** Redis
-- **Security:** JWT Authentication
-- **Build Tool:** Maven
-
-## Features
-
-- [x] User authentication with JWT
-- [x] Room management (create, join, leave, search)
-- [x] Real-time messaging with WebSockets (STOMP)
-- [x] Message history with pagination
-- [x] Online presence tracking with Redis
-- [ ] Typing indicators
-- [ ] Docker deployment
-
-## API Endpoints
-
-### Auth
-| Method | Endpoint | Description |
-|--------|----------|-------------|
-| POST | /api/auth/register | Register new user |
-| POST | /api/auth/login | Login and get JWT |
-
-### Rooms
-| Method | Endpoint | Description |
-|--------|----------|-------------|
-| POST | /api/rooms | Create a room |
-| GET | /api/rooms | Get public rooms |
-| GET | /api/rooms/{id} | Get room by ID |
-| GET | /api/rooms/search?q= | Search rooms |
-| GET | /api/rooms/my-rooms | My joined rooms |
-| POST | /api/rooms/{id}/join | Join a room |
-| DELETE | /api/rooms/{id}/leave | Leave a room |
-
-### Messages
-| Method | Endpoint | Description |
-|--------|----------|-------------|
-| GET | /api/messages/room/{id} | Get message history |
-
-### Presence
-| Method | Endpoint | Description |
-|--------|----------|-------------|
-| GET | /api/presence/online | Get all online users |
-| GET | /api/presence/check/{username} | Check if user is online |
-
-### WebSocket
-| Destination | Description |
-|-------------|-------------|
-| CONNECT /ws | Connect with JWT in Authorization header |
-| SEND /app/chat.send | Send a message to a room |
-| SEND /app/chat.join | Notify room you joined |
-| SEND /app/chat.leave | Notify room you left |
-| SUBSCRIBE /topic/room/{id} | Receive messages in a room |
-
-## Getting Started
-
-### Prerequisites
-
-- Java 17+
-- Maven 3.6+
-- PostgreSQL 14+
-- Redis 6+
-
-### Setup
-
-```bash
-# Start Redis (if using Docker)
-docker run -d -p 6379:6379 redis:latest
-
-# Create PostgreSQL database
-psql -U postgres -c "CREATE DATABASE chatflow;"
-
-# Clone and run
-git clone https://github.com/wreckurring/chatflow.git
-cd chatflow
-mvn clean install
-mvn spring-boot:run
-```
-
-### WebSocket Example
-
-```javascript
-const socket = new SockJS('http://localhost:8080/ws');
-const stompClient = Stomp.over(socket);
-
-stompClient.connect({ Authorization: 'Bearer ' + token }, () => {
-
-    // Subscribe to a room
-    stompClient.subscribe('/topic/room/1', (message) => {
-        const msg = JSON.parse(message.body);
-        console.log(msg);
-    });
-
-    // Join room
-    stompClient.send('/app/chat.join', {}, JSON.stringify({ roomId: 1 }));
-
-    // Send message
-    stompClient.send('/app/chat.send', {}, JSON.stringify({
-        roomId: 1,
-        content: 'Hello!'
-    }));
-});
-```
+| Layer | Technology |
+|-------|-----------|
+| **Backend** | Spring Boot 3.2, Java 17 |
+| **Real-time** | WebSocket (STOMP over SockJS) |
+| **Database** | PostgreSQL 15 |
+| **Cache** | Redis 7 |
+| **Security** | Spring Security + JWT |
+| **Deployment** | Docker, Docker Compose |
 
 ## Architecture
 
 ```
-Frontend (React/JS)
-    ↓
-Spring Boot Backend
-    ├── REST API (Auth, Rooms, Messages)
-    ├── WebSocket (Real-time chat)
-    ├── PostgreSQL (Persistent data)
-    └── Redis (Online presence, caching)
+┌─────────────────────────────────────────────────┐
+│              Client (React/JS)                  │
+└────────────┬────────────────────┬────────────────┘
+             │                    │
+        REST API            WebSocket (STOMP)
+             │                    │
+┌────────────┴────────────────────┴────────────────┐
+│           Spring Boot Backend                    │
+│  ┌──────────────┬──────────────┬──────────────┐ │
+│  │ Controllers  │  Services    │  Repositories│ │
+│  │   + JWT      │   + Redis    │   + JPA      │ │
+│  └──────────────┴──────────────┴──────────────┘ │
+└────────────┬────────────────────┬────────────────┘
+             │                    │
+      ┌──────┴──────┐      ┌──────┴──────┐
+      │ PostgreSQL  │      │    Redis    │
+      │  (Messages, │      │  (Presence, │
+      │   Users,    │      │   Sessions) │
+      │   Rooms)    │      │             │
+      └─────────────┘      └─────────────┘
 ```
 
-## Development Roadmap
+## Key Challenges Solved
 
-- [x] Project setup
-- [x] User authentication (JWT)
-- [x] Room management
-- [x] WebSocket real-time messaging
-- [x] Redis online presence
-- [ ] Typing indicators
-- [ ] Docker deployment
+- Designed room-based WebSocket pub/sub with JWT-secured handshake.
+- Implemented Redis TTL heartbeat for online presence tracking.
+- Secured REST + WebSocket channels with stateless JWT authentication and role checks.
+- Bi-directional real-time messaging with join/leave system events.
+
+## Scalability Design
+
+- Stateless architecture with Redis-backed session and presence state for horizontal scaling.
+- Indexed PostgreSQL queries with pagination to handle large message volumes efficiently.
+- Redis caching for hot presence/session data with automatic TTL cleanup.
+- Connection pooling, and Docker builds for production efficiency.
+
+## Security
+
+- **Authentication:** JWT tokens with configurable expiration (24h default)
+- **Authorization:** Room membership verified before message send/receive
+- **Password Security:** BCrypt with salt rounds
+- **Input Validation:** Bean Validation (JSR-380) on all DTOs
+- **WebSocket Security:** Token validation on every inbound message
+
+## Project Structure
+
+```
+chatflow/
+├── src/main/java/com/mohitkumar/chatflow/
+│   ├── config/              # Security, WebSocket, Redis config
+│   ├── controller/          # REST & WebSocket endpoints
+│   ├── model/               # JPA entities (User, Room, Message)
+│   ├── repository/          # Spring Data JPA repositories
+│   ├── service/             # Business logic layer
+│   ├── security/            # JWT utilities, filters, user details
+│   ├── dto/                 # Request/Response objects
+│   └── exception/           # Global error handling
+├── Dockerfile               # Multi-stage build
+├── docker-compose.yml       # PostgreSQL + Redis + App
+└── pom.xml                  # Maven dependencies
+```
+
+## Quick Start
+
+```bash
+# Clone and run entire stack
+git clone https://github.com/wreckurring/chatflow.git
+cd chatflow
+docker-compose up -d
+
+# Access at http://localhost:8080
+```
+
+## Future System Design Improvements
+
+- **WebSocket Clustering** - Redis pub/sub for cross-instance message routing
+- **Message Delivery Guarantees** - At-least-once delivery with acknowledgments
+- **Rate Limiting** - Token bucket algorithm to prevent abuse
+- **Event-Driven Architecture** - Kafka for decoupled notification service
+- **Monitoring & Observability** - Prometheus metrics, distributed tracing
+
+## Testing
+
+- Unit tests for service layer business logic
+- Integration tests for WebSocket message flow
+- Security tests for JWT validation
 
 ## License
 
 MIT License
+
+---
+
+<p>Built as part of my backend systems learning journey. </p>
