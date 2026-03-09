@@ -38,14 +38,8 @@ public class User {
     @Column(nullable = false)
     private String password;
 
-    // display name can be different from username
     @Column(name = "display_name")
     private String displayName;
-
-    @Enumerated(EnumType.STRING)
-    @Column(nullable = false)
-    @Builder.Default
-    private Status status = Status.OFFLINE;
 
     // rooms this user has joined
     @ManyToMany(mappedBy = "members", fetch = FetchType.LAZY)
@@ -55,8 +49,4 @@ public class User {
     @CreatedDate
     @Column(name = "created_at", updatable = false)
     private LocalDateTime createdAt;
-
-    public enum Status {
-        ONLINE, OFFLINE, AWAY
-    }
 }
