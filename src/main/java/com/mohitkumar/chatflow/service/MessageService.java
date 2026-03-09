@@ -8,15 +8,22 @@ import com.mohitkumar.chatflow.model.User;
 import com.mohitkumar.chatflow.repository.MessageRepository;
 import com.mohitkumar.chatflow.repository.RoomRepository;
 import com.mohitkumar.chatflow.repository.UserRepository;
+import io.github.resilience4j.circuitbreaker.annotation.CircuitBreaker;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
+import org.springframework.data.redis.core.RedisTemplate;
+import org.springframework.scheduling.annotation.Async;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.time.LocalDateTime;
 import java.util.Collections;
 import java.util.List;
+import java.util.stream.Collectors;
 
+@Slf4j
 @Service
 @RequiredArgsConstructor
 public class MessageService {
@@ -24,44 +31,90 @@ public class MessageService {
     private final MessageRepository messageRepository;
     private final UserRepository userRepository;
     private final RoomRepository roomRepository;
+    private final RedisTemplate<String, Object> redisTemplate;
 
-    @Transactional
-    public MessageResponse saveAndBroadcast(ChatMessage chatMessage, String senderUsername) {
+    private static final String CACHE_KEY_PREFIX = "room:messages:cache:";
+
+    @Transactional(readOnly = true)
+    public MessageResponse processAndCacheMessage(ChatMessage chatMessage, String senderUsername) {
         User sender = userRepository.findByUsername(senderUsername)
                 .orElseThrow(() -> new RuntimeException("User not found"));
 
         Room room = roomRepository.findById(chatMessage.getRoomId())
                 .orElseThrow(() -> new RuntimeException("Room not found"));
 
-        // Ensure sender is a member of the room
         if (!room.getMembers().contains(sender)) {
             throw new RuntimeException("You are not a member of this room");
         }
 
-        Message message = Message.builder()
+        MessageResponse response = MessageResponse.builder()
                 .content(chatMessage.getContent())
-                .sender(sender)
-                .room(room)
+                .senderUsername(sender.getUsername())
+                .senderDisplayName(sender.getDisplayName())
+                .roomId(room.getId())
                 .type(chatMessage.getType())
+                .sentAt(LocalDateTime.now())
                 .build();
 
-        Message saved = messageRepository.save(message);
-        return mapToResponse(saved);
+        String cacheKey = CACHE_KEY_PREFIX + room.getId();
+        redisTemplate.opsForList().leftPush(cacheKey, response);
+        redisTemplate.opsForList().trim(cacheKey, 0, 99); // Keep only the latest 100 messages in cache
+
+        saveToDatabaseAsync(chatMessage.getContent(), chatMessage.getType(), sender.getId(), room.getId());
+
+        return response;
     }
 
+    @Async
+    @Transactional
+    public void saveToDatabaseAsync(String content, Message.MessageType type, Long senderId, Long roomId) {
+        try {
+            Message message = Message.builder()
+                    .content(content)
+                    .type(type)
+                    .sender(userRepository.getReferenceById(senderId))
+                    .room(roomRepository.getReferenceById(roomId))
+                    .build();
+            messageRepository.save(message);
+        } catch (Exception e) {
+            log.error("Asynchronous DB save failed. Message in queue lost.", e);
+        }
+    }
+
+    @CircuitBreaker(name = "databaseCircuitBreaker", fallbackMethod = "getRoomHistoryFallback")
     public List<MessageResponse> getRoomHistory(Long roomId, int page, int size) {
-        Page<Message> messages = messageRepository.findByRoomIdOrderBySentAtDesc(
-                roomId, PageRequest.of(page, size));
+        String cacheKey = CACHE_KEY_PREFIX + roomId;
 
-        List<MessageResponse> responseList = messages.getContent()
-                .stream()
+        if (page == 0) {
+            List<Object> cachedData = redisTemplate.opsForList().range(cacheKey, 0, size - 1);
+            if (cachedData != null && !cachedData.isEmpty()) {
+                List<MessageResponse> responses = cachedData.stream()
+                        .map(obj -> (MessageResponse) obj)
+                        .collect(Collectors.toList());
+                Collections.reverse(responses);
+                return responses;
+            }
+        }
+
+        Page<Message> messages = messageRepository.findByRoomIdOrderBySentAtDesc(roomId, PageRequest.of(page, size));
+        List<MessageResponse> responseList = messages.getContent().stream()
                 .map(this::mapToResponse)
-                .toList();
+                .collect(Collectors.toList());
 
-        // Reverse so oldest message appears first (Java 17 compatible)
         Collections.reverse(responseList);
-
         return responseList;
+    }
+
+    public List<MessageResponse> getRoomHistoryFallback(Long roomId, int page, int size, Throwable t) {
+        log.warn("Database unavailable. Returning limited cached history from Redis via Circuit Breaker.");
+        List<Object> cachedData = redisTemplate.opsForList().range(CACHE_KEY_PREFIX + roomId, 0, 50);
+        if (cachedData == null) return Collections.emptyList();
+        
+        List<MessageResponse> responses = cachedData.stream()
+                .map(obj -> (MessageResponse) obj)
+                .collect(Collectors.toList());
+        Collections.reverse(responses);
+        return responses;
     }
 
     private MessageResponse mapToResponse(Message message) {

@@ -24,16 +24,22 @@ spring:
       port: 6379
       timeout: 60000ms
 
-server:
-  port: 8080
+  server:
+    port: 8080
 
-# JWT config
-jwt:
-  secret: mohitkumar-chatflow-secret-key-change-this-in-prod
-  expiration: 86400000
+  jwt:
+    secret: mohitkumar-chatflow-secret-key-change-this-in-prod
+    expiration: 86400000
 
-# App metadata
-app:
-  name: ChatFlow
-  version: 1.0.0
-  author: Mohit Kumar
+  resilience4j.circuitbreaker:
+    instances:
+      databaseCircuitBreaker:
+        slidingWindowSize: 10
+        failureRateThreshold: 50
+        waitDurationInOpenState: 10000ms
+        permittedNumberOfCallsInHalfOpenState: 3
+
+  app:
+    name: ChatFlow
+    version: 1.0.0
+    author: Mohit Kumar
