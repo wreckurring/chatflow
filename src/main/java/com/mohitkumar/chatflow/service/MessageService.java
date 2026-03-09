@@ -14,6 +14,7 @@ import org.springframework.data.domain.PageRequest;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.util.Collections;
 import java.util.List;
 
 @Service
@@ -32,7 +33,7 @@ public class MessageService {
         Room room = roomRepository.findById(chatMessage.getRoomId())
                 .orElseThrow(() -> new RuntimeException("Room not found"));
 
-        // make sure sender is actually in this room
+        // Ensure sender is a member of the room
         if (!room.getMembers().contains(sender)) {
             throw new RuntimeException("You are not a member of this room");
         }
@@ -52,12 +53,15 @@ public class MessageService {
         Page<Message> messages = messageRepository.findByRoomIdOrderBySentAtDesc(
                 roomId, PageRequest.of(page, size));
 
-        // reverse so oldest comes first
-        return messages.getContent()
+        List<MessageResponse> responseList = messages.getContent()
                 .stream()
                 .map(this::mapToResponse)
-                .toList()
-                .reversed();
+                .toList();
+
+        // Reverse so oldest message appears first (Java 17 compatible)
+        Collections.reverse(responseList);
+
+        return responseList;
     }
 
     private MessageResponse mapToResponse(Message message) {

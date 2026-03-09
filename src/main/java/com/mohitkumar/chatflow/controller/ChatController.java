@@ -20,8 +20,6 @@ public class ChatController {
     private final MessageService messageService;
     private final PresenceService presenceService;
 
-    // client sends to /app/chat.send
-    // everyone in the room gets it at /topic/room/{roomId}
     @MessageMapping("/chat.send")
     public void sendMessage(@Payload ChatMessage chatMessage, Principal principal) {
         // refresh user activity on every message

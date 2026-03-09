@@ -31,7 +31,12 @@ public class SecurityConfig {
         http
             .csrf(AbstractHttpConfigurer::disable)
             .authorizeHttpRequests(auth -> auth
-                .requestMatchers("/api/auth/**", "/api/health").permitAll()
+                    .requestMatchers(
+                            "/api/auth/**",
+                            "/api/health",
+                            "/ws/**",          // allow websocket handshake
+                            "/ws"              // allow base endpoint
+                    ).permitAll()
                 .anyRequest().authenticated()
             )
             .sessionManagement(session -> session
