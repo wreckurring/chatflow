@@ -103,9 +103,9 @@ docker-compose up -d
 
 ## Testing
 
-- Unit tests for service layer business logic
-- Integration tests for WebSocket message flow
-- Security tests for JWT validation
+- Unit tests for service layer business logic.
+- Integration tests for WebSocket message flow.
+- Security tests for JWT validation.
 
 ## License
 
