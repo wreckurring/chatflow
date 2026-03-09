@@ -17,6 +17,9 @@ import org.springframework.data.redis.core.RedisTemplate;
 import org.springframework.scheduling.annotation.Async;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.retry.annotation.Backoff;
+import org.springframework.retry.annotation.Recover;
+import org.springframework.retry.annotation.Retryable;
 
 import java.time.LocalDateTime;
 import java.util.Collections;
@@ -67,18 +70,25 @@ public class MessageService {
 
     @Async
     @Transactional
+    @Retryable(
+        retryFor = {Exception.class}, 
+        maxAttempts = 3, 
+        backoff = @Backoff(delay = 2000, multiplier = 2)
+    )
     public void saveToDatabaseAsync(String content, Message.MessageType type, Long senderId, Long roomId) {
-        try {
-            Message message = Message.builder()
-                    .content(content)
-                    .type(type)
-                    .sender(userRepository.getReferenceById(senderId))
-                    .room(roomRepository.getReferenceById(roomId))
-                    .build();
-            messageRepository.save(message);
-        } catch (Exception e) {
-            log.error("Asynchronous DB save failed. Message in queue lost.", e);
-        }
+        Message message = Message.builder()
+                .content(content)
+                .type(type)
+                .sender(userRepository.getReferenceById(senderId))
+                .room(roomRepository.getReferenceById(roomId))
+                .build();
+        messageRepository.save(message);
+        log.debug("Async save successful for message in room {}", roomId);
+    }
+
+    @Recover
+    public void recoverFailedMessageSave(Exception e, String content, Message.MessageType type, Long senderId, Long roomId) {
+        log.error("CRITICAL: Message completely failed to save to Postgres after 3 retries. Content lost. Room: {}, Error: {}", roomId, e.getMessage());
     }
 
     @CircuitBreaker(name = "databaseCircuitBreaker", fallbackMethod = "getRoomHistoryFallback")
