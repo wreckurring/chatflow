@@ -13,7 +13,7 @@ spring:
   jpa:
     hibernate:
       ddl-auto: update
-    show-sql: true
+    show-sql: false
     properties:
       hibernate:
         format_sql: true
@@ -39,7 +39,11 @@ spring:
         waitDurationInOpenState: 10000ms
         permittedNumberOfCallsInHalfOpenState: 3
 
-  app:
-    name: ChatFlow
-    version: 1.0.0
-    author: Mohit Kumar
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info,metrics
+  endpoint:
+    health:
+      show-details: always
