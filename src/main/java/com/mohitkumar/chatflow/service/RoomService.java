@@ -2,6 +2,7 @@ package com.mohitkumar.chatflow.service;
 
 import com.mohitkumar.chatflow.dto.CreateRoomRequest;
 import com.mohitkumar.chatflow.dto.RoomResponse;
+import com.mohitkumar.chatflow.dto.UserProfileResponse;
 import com.mohitkumar.chatflow.model.Room;
 import com.mohitkumar.chatflow.model.User;
 import com.mohitkumar.chatflow.repository.RoomRepository;
@@ -10,6 +11,7 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.util.Comparator;
 import java.util.List;
 
 @Service
@@ -97,6 +99,21 @@ public class RoomService {
 
     public RoomResponse getRoomById(Long roomId) {
         return mapToResponse(getRoom(roomId));
+    }
+
+    @Transactional(readOnly = true)
+    public List<UserProfileResponse> getRoomMembers(Long roomId) {
+        Room room = getRoom(roomId);
+        return room.getMembers().stream()
+                .sorted(Comparator.comparing(u -> u.getUsername()))
+                .map(u -> UserProfileResponse.builder()
+                        .id(u.getId())
+                        .username(u.getUsername())
+                        .email(u.getEmail())
+                        .displayName(u.getDisplayName())
+                        .createdAt(u.getCreatedAt())
+                        .build())
+                .toList();
     }
 
     // private helpers below

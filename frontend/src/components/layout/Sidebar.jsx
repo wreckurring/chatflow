@@ -5,7 +5,7 @@ import { useAuth } from '../../store/authStore'
 import { Avatar } from '../shared/Avatar'
 import { CreateRoomModal } from '../rooms/CreateRoomModal'
 
-export function Sidebar({ activeRoomId, onSelectRoom, wsConnected }) {
+export function Sidebar({ activeRoomId, onSelectRoom, wsConnected, unread = {} }) {
   const { user, signOut } = useAuth()
   const [myRooms, setMyRooms] = useState([])
   const [publicRooms, setPublicRooms] = useState([])
@@ -117,6 +117,7 @@ export function Sidebar({ activeRoomId, onSelectRoom, wsConnected }) {
                 active={room.id === activeRoomId}
                 joined={myRoomIds.has(room.id)}
                 joining={joining === room.id}
+                unreadCount={unread[room.id] ?? 0}
                 onSelect={() => handleJoin(room)}
               />
             ))}
@@ -149,6 +150,7 @@ export function Sidebar({ activeRoomId, onSelectRoom, wsConnected }) {
                 active={room.id === activeRoomId}
                 joined={myRoomIds.has(room.id)}
                 joining={joining === room.id}
+                unreadCount={unread[room.id] ?? 0}
                 onSelect={() => onSelectRoom(room)}
               />
             ))}
@@ -165,6 +167,7 @@ export function Sidebar({ activeRoomId, onSelectRoom, wsConnected }) {
                     active={false}
                     joined={false}
                     joining={joining === room.id}
+                    unreadCount={0}
                     onSelect={() => handleJoin(room)}
                   />
                 ))}
@@ -202,21 +205,32 @@ export function Sidebar({ activeRoomId, onSelectRoom, wsConnected }) {
   )
 }
 
-function RoomItem({ room, active, joined, joining, onSelect }) {
+function RoomItem({ room, active, joined, joining, unreadCount = 0, onSelect }) {
+  const hasUnread = unreadCount > 0 && !active
+
   return (
     <button
       onClick={onSelect}
       disabled={joining}
       className={`w-full flex items-center gap-2.5 px-3 py-2 rounded-md mx-1 text-left transition-colors group ${
-        active ? 'bg-accent-subtle text-ink' : 'text-ink-muted hover:text-ink hover:bg-surface-3'
+        active
+          ? 'bg-accent-subtle text-ink'
+          : hasUnread
+          ? 'text-ink hover:bg-surface-3'
+          : 'text-ink-muted hover:text-ink hover:bg-surface-3'
       }`}
       style={{ width: 'calc(100% - 8px)' }}
     >
-      <span className={`text-base leading-none w-5 shrink-0 text-center ${active ? 'text-accent' : 'text-ink-faint group-hover:text-ink-muted'}`}>
+      <span className={`text-base leading-none w-5 shrink-0 text-center ${active ? 'text-accent' : hasUnread ? 'text-accent-text' : 'text-ink-faint group-hover:text-ink-muted'}`}>
         #
       </span>
-      <span className="flex-1 text-xs font-medium truncate">{room.name}</span>
-      {!joined && (
+      <span className={`flex-1 text-xs truncate ${hasUnread ? 'font-semibold' : 'font-medium'}`}>{room.name}</span>
+      {hasUnread && (
+        <span className="text-2xs font-semibold bg-accent text-surface rounded-full min-w-[16px] h-4 flex items-center justify-center px-1">
+          {unreadCount > 99 ? '99+' : unreadCount}
+        </span>
+      )}
+      {!joined && !hasUnread && (
         <span className="text-2xs text-ink-faint bg-surface-4 px-1 py-0.5 rounded">
           {joining ? '…' : 'join'}
         </span>

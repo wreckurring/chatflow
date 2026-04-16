@@ -4,6 +4,7 @@ import { leaveRoom as apiLeaveRoom } from '../../api/rooms'
 import { useAuth } from '../../store/authStore'
 import { MessageBubble, DateSeparator } from './MessageBubble'
 import { TypingIndicator } from './TypingIndicator'
+import { MembersPanel } from './MembersPanel'
 import { Button } from '../shared/Button'
 
 function isSameDay(a, b) {
@@ -15,12 +16,13 @@ function isSameSender(a, b) {
   return a && b && a.senderUsername === b.senderUsername && a.type !== 'SYSTEM' && b.type !== 'SYSTEM'
 }
 
-export function ChatPanel({ room, ws, onMessageRef, onTypingRef, onLeave }) {
+export function ChatPanel({ room, ws, onMessageRef, onTypingRef, onLeave, onToggleSidebar }) {
   const { user } = useAuth()
   const [messages, setMessages]       = useState([])
   const [input, setInput]             = useState('')
   const [typists, setTypists]         = useState([])
   const [loadingHistory, setLoading]  = useState(true)
+  const [showMembers, setShowMembers] = useState(false)
   const bottomRef      = useRef(null)
   const inputRef       = useRef(null)
   const typingTimers   = useRef({})
@@ -111,23 +113,43 @@ export function ChatPanel({ room, ws, onMessageRef, onTypingRef, onLeave }) {
   }
 
   return (
-    <div className="flex flex-col h-full bg-surface">
+    <div className="flex h-full bg-surface overflow-hidden">
+      <div className="flex flex-col flex-1 min-w-0 overflow-hidden">
       {/* Header */}
-      <header className="flex items-center justify-between px-5 py-3 border-b border-border shrink-0 bg-surface-1/80 backdrop-blur-sm">
+      <header className="flex items-center justify-between px-4 py-3 border-b border-border shrink-0 bg-surface-1/80 backdrop-blur-sm">
         <div className="flex items-center gap-2 min-w-0">
+          {/* Mobile: hamburger to open sidebar */}
+          <button
+            onClick={onToggleSidebar}
+            className="md:hidden text-ink-muted hover:text-ink mr-1 transition-colors"
+          >
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+              <path d="M3 12h18M3 6h18M3 18h18"/>
+            </svg>
+          </button>
           <span className="text-ink-muted font-mono text-sm shrink-0">#</span>
           <h1 className="text-sm font-semibold text-ink">{room.name}</h1>
           {room.description && (
             <>
-              <span className="text-border-strong shrink-0">·</span>
-              <p className="text-xs text-ink-muted truncate">{room.description}</p>
+              <span className="text-border-strong shrink-0 hidden sm:inline">·</span>
+              <p className="text-xs text-ink-muted truncate hidden sm:block">{room.description}</p>
             </>
           )}
         </div>
-        <div className="flex items-center gap-3 shrink-0">
-          <span className="text-2xs text-ink-faint">
-            {room.memberCount} member{room.memberCount !== 1 ? 's' : ''}
-          </span>
+        <div className="flex items-center gap-2 shrink-0">
+          <button
+            onClick={() => setShowMembers(v => !v)}
+            className={`flex items-center gap-1.5 text-xs px-2 py-1 rounded transition-colors ${
+              showMembers ? 'text-accent bg-accent-subtle' : 'text-ink-faint hover:text-ink hover:bg-surface-3'
+            }`}
+            title="Toggle members"
+          >
+            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+              <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/>
+              <path d="M23 21v-2a4 4 0 0 0-3-3.87M16 3.13a4 4 0 0 1 0 7.75"/>
+            </svg>
+            <span className="hidden sm:inline">{room.memberCount}</span>
+          </button>
           <button
             onClick={handleLeave}
             className="text-xs text-ink-faint hover:text-danger transition-colors px-2 py-1 rounded hover:bg-danger-subtle"
@@ -211,6 +233,11 @@ export function ChatPanel({ room, ws, onMessageRef, onTypingRef, onLeave }) {
         </form>
         <p className="text-2xs text-ink-faint mt-1 text-right">↵ send · ⇧↵ newline</p>
       </div>
+      </div>{/* end flex-col */}
+
+      {showMembers && (
+        <MembersPanel roomId={room.id} onClose={() => setShowMembers(false)} />
+      )}
     </div>
   )
 }

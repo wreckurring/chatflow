@@ -2,6 +2,7 @@ package com.mohitkumar.chatflow.controller;
 
 import com.mohitkumar.chatflow.dto.CreateRoomRequest;
 import com.mohitkumar.chatflow.dto.RoomResponse;
+import com.mohitkumar.chatflow.dto.UserProfileResponse;
 import com.mohitkumar.chatflow.service.RoomService;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
@@ -52,6 +53,11 @@ public class RoomController {
             @PathVariable Long roomId,
             @AuthenticationPrincipal UserDetails userDetails) {
         return ResponseEntity.ok(roomService.joinRoom(roomId, userDetails.getUsername()));
+    }
+
+    @GetMapping("/{roomId}/members")
+    public ResponseEntity<List<UserProfileResponse>> getRoomMembers(@PathVariable Long roomId) {
+        return ResponseEntity.ok(roomService.getRoomMembers(roomId));
     }
 
     @DeleteMapping("/{roomId}/leave")
