@@ -5,7 +5,7 @@ import { useAuth } from '../../store/authStore'
 import { Avatar } from '../shared/Avatar'
 import { CreateRoomModal } from '../rooms/CreateRoomModal'
 
-export function Sidebar({ activeRoomId, onSelectRoom }) {
+export function Sidebar({ activeRoomId, onSelectRoom, wsConnected }) {
   const { user, signOut } = useAuth()
   const [myRooms, setMyRooms] = useState([])
   const [publicRooms, setPublicRooms] = useState([])
@@ -43,12 +43,14 @@ export function Sidebar({ activeRoomId, onSelectRoom }) {
   const handleJoin = async (room) => {
     setJoining(room.id)
     try {
-      await joinRoom(room.id)
+      const updated = await joinRoom(room.id)
       await loadRooms()
-      onSelectRoom(room)
+      onSelectRoom(updated)
     } catch {
-      // already member — just switch
-      onSelectRoom(room)
+      // already a member — reload to get fresh data then switch
+      await loadRooms()
+      const fresh = [...myRooms, ...publicRooms].find(r => r.id === room.id) || room
+      onSelectRoom(fresh)
     } finally {
       setJoining(null)
     }
@@ -70,9 +72,12 @@ export function Sidebar({ activeRoomId, onSelectRoom }) {
             </span>
             <span className="text-sm font-semibold text-ink tracking-tight">chatflow</span>
           </div>
-          <div className="flex items-center gap-1">
-            <span className="w-1.5 h-1.5 rounded-full bg-accent animate-pulse" />
-            <span className="text-2xs text-ink-muted">{onlineCount}</span>
+          <div className="flex items-center gap-1.5">
+            <span
+              className={`w-1.5 h-1.5 rounded-full transition-colors ${wsConnected ? 'bg-accent' : 'bg-ink-faint'}`}
+              title={wsConnected ? 'Connected' : 'Connecting…'}
+            />
+            <span className="text-2xs text-ink-muted">{onlineCount} online</span>
           </div>
         </div>
       </div>

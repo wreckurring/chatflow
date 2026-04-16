@@ -1,12 +1,24 @@
-import { useEffect, useRef, useCallback } from 'react'
+import { useEffect, useRef, useCallback, useState } from 'react'
 import { Client } from '@stomp/stompjs'
 import SockJS from 'sockjs-client'
 
-export function useWebSocket({ token, onMessage, onTyping, roomId }) {
-  const clientRef = useRef(null)
-  const roomIdRef = useRef(roomId)
+/**
+ * Single persistent STOMP connection for the app session.
+ * - Connection lives as long as token is valid.
+ * - Subscriptions are tracked per room; old ones are cleaned up.
+ * - Callbacks are stored in refs so they never go stale inside STOMP frames.
+ */
+export function useWebSocket({ token, onMessage, onTyping }) {
+  const clientRef   = useRef(null)
+  const subsRef     = useRef({})       // roomId → { msgSub, typingSub }
+  const pendingJoin = useRef(null)     // roomId to subscribe once connected
+  const onMsgRef    = useRef(onMessage)
+  const onTypRef    = useRef(onTyping)
+  const [connected, setConnected] = useState(false)
 
-  useEffect(() => { roomIdRef.current = roomId }, [roomId])
+  // Keep callback refs fresh every render — no stale closures
+  useEffect(() => { onMsgRef.current = onMessage }, [onMessage])
+  useEffect(() => { onTypRef.current = onTyping  }, [onTyping])
 
   useEffect(() => {
     if (!token) return
@@ -14,45 +26,80 @@ export function useWebSocket({ token, onMessage, onTyping, roomId }) {
     const client = new Client({
       webSocketFactory: () => new SockJS('/ws'),
       connectHeaders: { Authorization: `Bearer ${token}` },
-      reconnectDelay: 3000,
+      reconnectDelay: 4000,
       onConnect: () => {
-        if (roomIdRef.current) {
-          subscribeToRoom(client, roomIdRef.current)
+        clientRef.current = client
+        setConnected(true)
+        // flush pending join
+        if (pendingJoin.current != null) {
+          _subscribe(client, pendingJoin.current)
+          pendingJoin.current = null
         }
+      },
+      onDisconnect: () => {
+        subsRef.current = {}
+        setConnected(false)
       },
     })
 
     client.activate()
     clientRef.current = client
 
-    return () => { client.deactivate() }
-  }, [token]) // only reconnect when token changes
+    return () => {
+      subsRef.current = {}
+      pendingJoin.current = null
+      client.deactivate()
+    }
+  }, [token])
 
-  const subscribeToRoom = useCallback((client, id) => {
-    if (!client?.connected) return
+  // Internal subscribe — always use ref callbacks
+  const _subscribe = (client, roomId) => {
+    // Unsubscribe existing for this room if any
+    const existing = subsRef.current[roomId]
+    if (existing) {
+      existing.msgSub?.unsubscribe()
+      existing.typingSub?.unsubscribe()
+    }
 
-    client.subscribe(`/topic/room/${id}`, (frame) => {
-      const msg = JSON.parse(frame.body)
-      onMessage?.(msg)
+    const msgSub = client.subscribe(`/topic/room/${roomId}`, (frame) => {
+      try { onMsgRef.current?.(JSON.parse(frame.body)) } catch {}
     })
 
-    client.subscribe(`/topic/room/${id}/typing`, (frame) => {
-      const event = JSON.parse(frame.body)
-      onTyping?.(event)
+    const typingSub = client.subscribe(`/topic/room/${roomId}/typing`, (frame) => {
+      try { onTypRef.current?.(JSON.parse(frame.body)) } catch {}
     })
 
-    // notify server user joined
+    subsRef.current[roomId] = { msgSub, typingSub }
+
     client.publish({
       destination: '/app/chat.join',
-      body: JSON.stringify({ roomId: id }),
+      body: JSON.stringify({ roomId }),
     })
-  }, [onMessage, onTyping])
+  }
 
-  const joinRoom = useCallback((id) => {
+  const joinRoom = useCallback((roomId) => {
     const client = clientRef.current
-    if (!client?.connected) return
-    subscribeToRoom(client, id)
-  }, [subscribeToRoom])
+    if (client?.connected) {
+      _subscribe(client, roomId)
+    } else {
+      // Will be flushed once onConnect fires
+      pendingJoin.current = roomId
+    }
+  }, [])
+
+  const leaveRoom = useCallback((roomId) => {
+    const client = clientRef.current
+    const subs = subsRef.current[roomId]
+    if (subs) {
+      subs.msgSub?.unsubscribe()
+      subs.typingSub?.unsubscribe()
+      delete subsRef.current[roomId]
+    }
+    client?.publish({
+      destination: '/app/chat.leave',
+      body: JSON.stringify({ roomId }),
+    })
+  }, [])
 
   const sendMessage = useCallback((roomId, content) => {
     clientRef.current?.publish({
@@ -68,12 +115,5 @@ export function useWebSocket({ token, onMessage, onTyping, roomId }) {
     })
   }, [])
 
-  const leaveRoom = useCallback((id) => {
-    clientRef.current?.publish({
-      destination: '/app/chat.leave',
-      body: JSON.stringify({ roomId: id }),
-    })
-  }, [])
-
-  return { joinRoom, sendMessage, sendTyping, leaveRoom, client: clientRef }
+  return { joinRoom, leaveRoom, sendMessage, sendTyping, connected }
 }
