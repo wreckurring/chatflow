@@ -34,6 +34,7 @@ public class SecurityConfig {
                     .requestMatchers(
                             "/api/auth/**",
                             "/api/health",
+                            "/actuator/health",
                             "/ws/**",          // allow websocket handshake
                             "/ws"              // allow base endpoint
                     ).permitAll()

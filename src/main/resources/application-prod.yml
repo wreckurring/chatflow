@@ -23,25 +23,19 @@ spring:
       port: ${SPRING_DATA_REDIS_PORT:6379}
       timeout: 60000ms
 
-  server:
-    port: 8080
-    compression:
-      enabled: true
-    error:
-      include-message: always
+server:
+  port: 8080
+  compression:
+    enabled: true
+  error:
+    include-message: always
 
-  jwt:
-    secret: ${JWT_SECRET:mohitkumar-chatflow-secret-key-change-this-in-prod}
-    expiration: 86400000
+jwt:
+  secret: ${JWT_SECRET:mohitkumar-chatflow-secret-key-change-this-in-prod}
+  expiration: 86400000
 
-  logging:
-    level:
-      root: INFO
-      com.mohitkumar.chatflow: INFO
-    pattern:
-      console: "%d{yyyy-MM-dd HH:mm:ss} - %msg%n"
-
-  resilience4j.circuitbreaker:
+resilience4j:
+  circuitbreaker:
     instances:
       databaseCircuitBreaker:
         slidingWindowSize: 10
@@ -49,7 +43,9 @@ spring:
         waitDurationInOpenState: 10000ms
         permittedNumberOfCallsInHalfOpenState: 3
 
-  app:
-    name: ChatFlow
-    version: 1.0.0
-    author: Mohit Kumar
+logging:
+  level:
+    root: INFO
+    com.mohitkumar.chatflow: INFO
+  pattern:
+    console: "%d{yyyy-MM-dd HH:mm:ss} - %msg%n"
