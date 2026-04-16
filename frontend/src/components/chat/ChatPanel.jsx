@@ -6,6 +6,8 @@ import { MessageBubble, DateSeparator } from './MessageBubble'
 import { TypingIndicator } from './TypingIndicator'
 import { MembersPanel } from './MembersPanel'
 import { Button } from '../shared/Button'
+import { useAutoResize } from '../../hooks/useAutoResize'
+import { toast } from '../shared/Toast'
 
 function isSameDay(a, b) {
   if (!a || !b) return false
@@ -28,6 +30,8 @@ export function ChatPanel({ room, ws, onMessageRef, onTypingRef, onLeave, onTogg
   const typingTimers   = useRef({})
   const isTypingRef    = useRef(false)
   const typingDebounce = useRef(null)
+
+  useAutoResize(inputRef, input)
 
   // Wire up handlers into the shared refs so the WS hook gets them
   useEffect(() => {
@@ -83,10 +87,14 @@ export function ChatPanel({ room, ws, onMessageRef, onTypingRef, onLeave, onTogg
     e?.preventDefault()
     const text = input.trim()
     if (!text) return
-    ws.sendMessage(room.id, text)
-    setInput('')
-    isTypingRef.current = false
-    ws.sendTyping(room.id, false)
+    try {
+      ws.sendMessage(room.id, text)
+      setInput('')
+      isTypingRef.current = false
+      ws.sendTyping(room.id, false)
+    } catch {
+      toast('Failed to send message — check your connection')
+    }
   }, [input, room.id, ws])
 
   const handleInputChange = (e) => {

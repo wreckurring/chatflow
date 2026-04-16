@@ -31,14 +31,17 @@ public class SecurityConfig {
         http
             .csrf(AbstractHttpConfigurer::disable)
             .authorizeHttpRequests(auth -> auth
-                    .requestMatchers(
-                            "/api/auth/**",
-                            "/api/health",
-                            "/actuator/health",
-                            "/ws/**",          // allow websocket handshake
-                            "/ws"              // allow base endpoint
-                    ).permitAll()
-                .anyRequest().authenticated()
+                    // Public API endpoints
+                    .requestMatchers("/api/auth/**", "/api/health", "/actuator/health").permitAll()
+                    // WebSocket handshake
+                    .requestMatchers("/ws/**", "/ws").permitAll()
+                    // Static frontend assets — SPA handles its own auth in JS
+                    .requestMatchers("/", "/index.html", "/assets/**", "/*.js", "/*.css",
+                                     "/*.svg", "/*.ico", "/*.png", "/*.webmanifest").permitAll()
+                    // All other API calls require authentication
+                    .requestMatchers("/api/**").authenticated()
+                    // Non-API paths fall through to SPA (index.html catch-all)
+                    .anyRequest().permitAll()
             )
             .sessionManagement(session -> session
                 .sessionCreationPolicy(SessionCreationPolicy.STATELESS)

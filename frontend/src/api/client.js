@@ -1,4 +1,5 @@
 import axios from 'axios'
+import { toast } from '../components/shared/Toast'
 
 const client = axios.create({
   baseURL: '/api',
@@ -18,6 +19,11 @@ client.interceptors.response.use(
       localStorage.removeItem('token')
       localStorage.removeItem('user')
       window.location.reload()
+      return Promise.reject(err)
+    }
+    // Network error (no response) — show a toast
+    if (!err.response) {
+      toast('Network error — check your connection')
     }
     return Promise.reject(err)
   }

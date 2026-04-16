@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { createRoom } from '../../api/rooms'
 import { Button } from '../shared/Button'
 import { Input } from '../shared/Input'
@@ -7,6 +7,12 @@ export function CreateRoomModal({ onClose, onCreated }) {
   const [form, setForm] = useState({ name: '', description: '', type: 'PUBLIC' })
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState('')
+
+  useEffect(() => {
+    const handler = (e) => { if (e.key === 'Escape') onClose() }
+    window.addEventListener('keydown', handler)
+    return () => window.removeEventListener('keydown', handler)
+  }, [onClose])
 
   const set = (k) => (e) => setForm(f => ({ ...f, [k]: e.target.value }))
 

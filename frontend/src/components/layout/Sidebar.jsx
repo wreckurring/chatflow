@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import { getMyRooms, getPublicRooms, joinRoom, searchRooms } from '../../api/rooms'
 import { getOnlinePresence } from '../../api/presence'
 import { useAuth } from '../../store/authStore'
@@ -14,11 +14,24 @@ export function Sidebar({ activeRoomId, onSelectRoom, wsConnected, unread = {} }
   const [searchResults, setSearchResults] = useState(null)
   const [showCreate, setShowCreate] = useState(false)
   const [joining, setJoining] = useState(null)
+  const searchRef = useRef(null)
+
+  useEffect(() => {
+    const handler = (e) => {
+      if ((e.ctrlKey || e.metaKey) && e.key === 'k') {
+        e.preventDefault()
+        searchRef.current?.focus()
+      }
+    }
+    window.addEventListener('keydown', handler)
+    return () => window.removeEventListener('keydown', handler)
+  }, [])
 
   const loadRooms = async () => {
     const [mine, pub] = await Promise.all([getMyRooms(), getPublicRooms()])
     setMyRooms(mine)
     setPublicRooms(pub)
+    return { mine, pub }
   }
 
   useEffect(() => {
@@ -48,8 +61,8 @@ export function Sidebar({ activeRoomId, onSelectRoom, wsConnected, unread = {} }
       onSelectRoom(updated)
     } catch {
       // already a member — reload to get fresh data then switch
-      await loadRooms()
-      const fresh = [...myRooms, ...publicRooms].find(r => r.id === room.id) || room
+      const { mine, pub } = await loadRooms()
+      const fresh = [...mine, ...pub].find(r => r.id === room.id) || room
       onSelectRoom(fresh)
     } finally {
       setJoining(null)
@@ -89,11 +102,15 @@ export function Sidebar({ activeRoomId, onSelectRoom, wsConnected, unread = {} }
             <circle cx="11" cy="11" r="8"/><path d="m21 21-4.35-4.35"/>
           </svg>
           <input
+            ref={searchRef}
             value={search}
             onChange={e => setSearch(e.target.value)}
             placeholder="Search rooms…"
             className="bg-transparent text-xs text-ink placeholder-ink-faint w-full focus:outline-none"
           />
+          {!search && (
+            <span className="text-2xs text-ink-faint font-mono shrink-0">⌘K</span>
+          )}
           {search && (
             <button onClick={() => setSearch('')} className="text-ink-muted hover:text-ink">
               <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5">
