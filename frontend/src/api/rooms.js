@@ -8,3 +8,5 @@ export const joinRoom = (id) => client.post(`/rooms/${id}/join`).then(r => r.dat
 export const leaveRoom = (id) => client.delete(`/rooms/${id}/leave`).then(r => r.data)
 export const searchRooms   = (q) => client.get(`/rooms/search?q=${encodeURIComponent(q)}`).then(r => r.data)
 export const getRoomMembers = (id) => client.get(`/rooms/${id}/members`).then(r => r.data)
+export const updateRoom = (id, data) => client.patch(`/rooms/${id}`, data).then(r => r.data)
+export const deleteRoom = (id) => client.delete(`/rooms/${id}`)

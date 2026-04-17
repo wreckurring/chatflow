@@ -5,6 +5,8 @@ import com.mohitkumar.chatflow.dto.RoomResponse;
 import com.mohitkumar.chatflow.dto.UserProfileResponse;
 import com.mohitkumar.chatflow.service.RoomService;
 import jakarta.validation.Valid;
+import jakarta.validation.constraints.Size;
+import lombok.Data;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
@@ -66,5 +68,29 @@ public class RoomController {
             @AuthenticationPrincipal UserDetails userDetails) {
         roomService.leaveRoom(roomId, userDetails.getUsername());
         return ResponseEntity.noContent().build();
+    }
+
+    @PatchMapping("/{roomId}")
+    public ResponseEntity<RoomResponse> updateRoom(
+            @PathVariable Long roomId,
+            @RequestBody UpdateRoomRequest body,
+            @AuthenticationPrincipal UserDetails userDetails) {
+        return ResponseEntity.ok(roomService.updateRoom(roomId, body.getName(), body.getDescription(), userDetails.getUsername()));
+    }
+
+    @DeleteMapping("/{roomId}")
+    public ResponseEntity<Void> deleteRoom(
+            @PathVariable Long roomId,
+            @AuthenticationPrincipal UserDetails userDetails) {
+        roomService.deleteRoom(roomId, userDetails.getUsername());
+        return ResponseEntity.noContent().build();
+    }
+
+    @Data
+    public static class UpdateRoomRequest {
+        @Size(min = 1, max = 50)
+        private String name;
+        @Size(max = 255)
+        private String description;
     }
 }

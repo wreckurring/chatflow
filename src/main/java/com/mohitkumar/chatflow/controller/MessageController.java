@@ -46,10 +46,27 @@ public class MessageController {
         return ResponseEntity.noContent().build();
     }
 
+    @PostMapping("/{id}/reactions")
+    public ResponseEntity<MessageResponse> toggleReaction(
+            @PathVariable Long id,
+            @RequestBody ReactionRequest body,
+            Principal principal) {
+        MessageResponse updated = messageService.toggleReaction(id, body.getEmoji(), principal.getName());
+        messagingTemplate.convertAndSend("/topic/room/" + updated.getRoomId(), updated);
+        return ResponseEntity.ok(updated);
+    }
+
     @Data
     public static class EditMessageRequest {
         @NotBlank
         @Size(max = 2000)
         private String content;
+    }
+
+    @Data
+    public static class ReactionRequest {
+        @NotBlank
+        @Size(max = 10)
+        private String emoji;
     }
 }

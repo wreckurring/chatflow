@@ -8,3 +8,6 @@ export const editMessage = (id, content) =>
 
 export const deleteMessage = (id) =>
   client.delete(`/messages/${id}`)
+
+export const toggleReaction = (id, emoji) =>
+  client.post(`/messages/${id}/reactions`, { emoji }).then(r => r.data)

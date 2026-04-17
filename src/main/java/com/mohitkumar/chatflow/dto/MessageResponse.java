@@ -24,8 +24,14 @@ public class MessageResponse {
     private LocalDateTime editedAt;
     private boolean deleted;
     private EventType eventType;
+    private Long replyToId;
+    private String replyToContent;
+    private String replyToSenderUsername;
+    private String replyToSenderDisplayName;
+    // emoji → list of usernames who reacted
+    private java.util.Map<String, java.util.List<String>> reactions;
 
     public enum EventType {
-        SENT, EDITED, DELETED
+        SENT, EDITED, DELETED, REACTION_UPDATE
     }
 }

@@ -37,6 +37,10 @@ public class Message {
     @Builder.Default
     private MessageType type = MessageType.TEXT;
 
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "reply_to_id")
+    private Message replyTo;
+
     @CreatedDate
     @Column(name = "sent_at", updatable = false)
     private LocalDateTime sentAt;

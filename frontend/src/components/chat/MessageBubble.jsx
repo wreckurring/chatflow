@@ -1,6 +1,6 @@
 import { useState, useCallback, useRef, useEffect } from 'react'
 import { Avatar } from '../shared/Avatar'
-import { editMessage, deleteMessage } from '../../api/messages'
+import { editMessage, deleteMessage, toggleReaction } from '../../api/messages'
 import { toast } from '../shared/Toast'
 
 function formatTime(ts) {
@@ -39,9 +39,68 @@ export function SystemMessage({ content }) {
   )
 }
 
+const QUICK_EMOJIS = ['👍', '❤️', '😂', '🎉', '😮', '😢', '🔥', '👀']
+
+function EmojiPicker({ onPick, onClose }) {
+  const ref = useRef(null)
+
+  useEffect(() => {
+    const handler = (e) => { if (ref.current && !ref.current.contains(e.target)) onClose() }
+    document.addEventListener('mousedown', handler)
+    return () => document.removeEventListener('mousedown', handler)
+  }, [onClose])
+
+  return (
+    <div
+      ref={ref}
+      className="absolute z-20 bottom-full mb-1 bg-surface-2 border border-border rounded-lg p-1.5 flex gap-1 shadow-lg"
+    >
+      {QUICK_EMOJIS.map(e => (
+        <button
+          key={e}
+          onClick={() => { onPick(e); onClose() }}
+          className="text-base w-7 h-7 flex items-center justify-center rounded hover:bg-surface-3 transition-colors"
+        >
+          {e}
+        </button>
+      ))}
+    </div>
+  )
+}
+
+function ReactionBar({ reactions, messageId, currentUsername }) {
+  if (!reactions || Object.keys(reactions).length === 0) return null
+
+  const handleClick = async (emoji) => {
+    try { await toggleReaction(messageId, emoji) }
+    catch { toast('Failed to update reaction') }
+  }
+
+  return (
+    <div className="flex flex-wrap gap-1 mt-1">
+      {Object.entries(reactions).map(([emoji, users]) => {
+        const mine = users.includes(currentUsername)
+        return (
+          <button
+            key={emoji}
+            onClick={() => handleClick(emoji)}
+            className={`flex items-center gap-1 px-1.5 py-0.5 rounded-full text-xs border transition-colors ${
+              mine
+                ? 'bg-accent-subtle border-accent/40 text-ink'
+                : 'bg-surface-3 border-border text-ink-muted hover:border-border-strong hover:text-ink'
+            }`}
+          >
+            <span>{emoji}</span>
+            <span className="text-2xs font-medium">{users.length}</span>
+          </button>
+        )
+      })}
+    </div>
+  )
+}
+
 function CopyButton({ text }) {
   const [copied, setCopied] = useState(false)
-
   const handleCopy = useCallback(async (e) => {
     e.stopPropagation()
     await navigator.clipboard.writeText(text).catch(() => {})
@@ -50,11 +109,7 @@ function CopyButton({ text }) {
   }, [text])
 
   return (
-    <button
-      onClick={handleCopy}
-      className="opacity-0 group-hover:opacity-100 transition-opacity text-ink-faint hover:text-ink p-1 rounded"
-      title="Copy"
-    >
+    <button onClick={handleCopy} className="text-ink-faint hover:text-ink p-1 rounded transition-colors" title="Copy">
       {copied ? (
         <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="#10B981" strokeWidth="2.5">
           <polyline points="20 6 9 17 4 12"/>
@@ -68,24 +123,18 @@ function CopyButton({ text }) {
   )
 }
 
-// Renders text with inline `code` and ```code block``` support
+// Markdown + code rendering
 function MessageContent({ text }) {
   const parts = []
-  // Split on triple-backtick blocks first
   const blockRe = /```([\s\S]*?)```/g
-  let last = 0
-  let match
+  let last = 0, match
 
   while ((match = blockRe.exec(text)) !== null) {
-    if (match.index > last) {
-      parts.push({ type: 'text', value: text.slice(last, match.index) })
-    }
+    if (match.index > last) parts.push({ type: 'text', value: text.slice(last, match.index) })
     parts.push({ type: 'block', value: match[1].replace(/^\n/, '').replace(/\n$/, '') })
     last = match.index + match[0].length
   }
-  if (last < text.length) {
-    parts.push({ type: 'text', value: text.slice(last) })
-  }
+  if (last < text.length) parts.push({ type: 'text', value: text.slice(last) })
 
   return (
     <>
@@ -97,24 +146,44 @@ function MessageContent({ text }) {
             </pre>
           )
         }
-        // inline `code` within text segments
-        const inline = part.value.split(/(`[^`]+`)/)
-        return (
-          <span key={i}>
-            {inline.map((seg, j) => {
-              if (seg.startsWith('`') && seg.endsWith('`') && seg.length > 2) {
-                return (
-                  <code key={j} className="px-1 py-0.5 bg-surface rounded text-xs font-mono text-accent">
-                    {seg.slice(1, -1)}
-                  </code>
-                )
-              }
-              return <span key={j} style={{ whiteSpace: 'pre-wrap' }}>{seg}</span>
-            })}
-          </span>
-        )
+        return <InlineMarkdown key={i} text={part.value} />
       })}
     </>
+  )
+}
+
+function InlineMarkdown({ text }) {
+  // Parse inline tokens: `code`, **bold**, *italic*, ~~strike~~, [text](url)
+  const tokenRe = /(`[^`]+`|\*\*[^*]+\*\*|\*[^*]+\*|~~[^~]+~~|\[[^\]]+\]\([^)]+\))/g
+  const segments = text.split(tokenRe)
+
+  return (
+    <span style={{ whiteSpace: 'pre-wrap' }}>
+      {segments.map((seg, i) => {
+        if (seg.startsWith('`') && seg.endsWith('`') && seg.length > 2) {
+          return <code key={i} className="px-1 py-0.5 bg-surface rounded text-xs font-mono text-accent">{seg.slice(1, -1)}</code>
+        }
+        if (seg.startsWith('**') && seg.endsWith('**')) {
+          return <strong key={i} className="font-semibold text-ink">{seg.slice(2, -2)}</strong>
+        }
+        if (seg.startsWith('*') && seg.endsWith('*')) {
+          return <em key={i} className="italic">{seg.slice(1, -1)}</em>
+        }
+        if (seg.startsWith('~~') && seg.endsWith('~~')) {
+          return <span key={i} className="line-through text-ink-muted">{seg.slice(2, -2)}</span>
+        }
+        const linkMatch = seg.match(/^\[([^\]]+)\]\(([^)]+)\)$/)
+        if (linkMatch) {
+          return (
+            <a key={i} href={linkMatch[2]} target="_blank" rel="noopener noreferrer"
+               className="text-accent underline underline-offset-2 hover:text-accent/80">
+              {linkMatch[1]}
+            </a>
+          )
+        }
+        return <span key={i}>{seg}</span>
+      })}
+    </span>
   )
 }
 
@@ -131,11 +200,6 @@ function InlineEditor({ messageId, initialContent, isMine, onDone }) {
     el.focus()
     el.setSelectionRange(el.value.length, el.value.length)
   }, [])
-
-  const handleKey = (e) => {
-    if (e.key === 'Escape') { onDone(null); return }
-    if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); handleSave() }
-  }
 
   const handleSave = async () => {
     const trimmed = value.trim()
@@ -162,23 +226,26 @@ function InlineEditor({ messageId, initialContent, isMine, onDone }) {
           e.target.style.height = 'auto'
           e.target.style.height = e.target.scrollHeight + 'px'
         }}
-        onKeyDown={handleKey}
+        onKeyDown={e => {
+          if (e.key === 'Escape') { onDone(null); return }
+          if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); handleSave() }
+        }}
         disabled={saving}
         className="w-full max-w-[72%] px-3 py-2 rounded-lg text-sm font-mono leading-relaxed bg-surface-2 border border-accent/40 text-ink resize-none focus:outline-none"
         style={{ minHeight: '2rem' }}
       />
       <div className="flex items-center gap-2 text-2xs text-ink-faint">
-        <span>↵ save</span>
-        <span>·</span>
+        <span>↵ save</span><span>·</span>
         <button onClick={() => onDone(null)} className="hover:text-ink transition-colors">esc cancel</button>
       </div>
     </div>
   )
 }
 
-export function MessageBubble({ message, showAvatar, isMine }) {
+export function MessageBubble({ message, showAvatar, isMine, currentUsername, onReply }) {
   const [editing, setEditing] = useState(false)
   const [deleting, setDeleting] = useState(false)
+  const [showPicker, setShowPicker] = useState(false)
 
   if (message.type === 'SYSTEM') return <SystemMessage content={message.content} />
 
@@ -186,12 +253,13 @@ export function MessageBubble({ message, showAvatar, isMine }) {
     e.stopPropagation()
     if (deleting) return
     setDeleting(true)
-    try {
-      await deleteMessage(message.id)
-    } catch {
-      toast('Failed to delete message')
-      setDeleting(false)
-    }
+    try { await deleteMessage(message.id) }
+    catch { toast('Failed to delete message'); setDeleting(false) }
+  }
+
+  const handleReact = async (emoji) => {
+    try { await toggleReaction(message.id, emoji) }
+    catch { toast('Failed to add reaction') }
   }
 
   if (editing) {
@@ -207,12 +275,7 @@ export function MessageBubble({ message, showAvatar, isMine }) {
               <span className="text-2xs text-ink-faint">{formatTime(message.sentAt)}</span>
             </div>
           )}
-          <InlineEditor
-            messageId={message.id}
-            initialContent={message.content}
-            isMine={isMine}
-            onDone={() => setEditing(false)}
-          />
+          <InlineEditor messageId={message.id} initialContent={message.content} isMine={isMine} onDone={() => setEditing(false)} />
         </div>
       </div>
     )
@@ -232,13 +295,28 @@ export function MessageBubble({ message, showAvatar, isMine }) {
           </div>
         )}
 
-        {/* Bubble + action buttons row */}
+        {/* Reply quote */}
+        {message.replyToId && (
+          <div className={`flex items-start gap-1.5 mb-1 max-w-full ${isMine ? 'flex-row-reverse' : ''}`}>
+            <div className="w-0.5 rounded-full bg-accent/50 shrink-0 self-stretch" />
+            <p className="text-2xs text-ink-faint truncate max-w-xs">
+              <span className="font-medium text-ink-muted">{message.replyToSenderDisplayName || message.replyToSenderUsername}</span>
+              {': '}
+              {message.replyToContent
+                ? <span>{message.replyToContent.slice(0, 80)}{message.replyToContent.length > 80 ? '…' : ''}</span>
+                : <span className="italic">deleted message</span>
+              }
+            </p>
+          </div>
+        )}
+
+        {/* Bubble + action buttons */}
         <div className={`flex items-start gap-1.5 ${isMine ? 'flex-row-reverse' : ''}`}>
           <div
-            className={`px-3 py-2 rounded-lg text-sm font-mono leading-relaxed break-words ${
+            className={`px-3 py-2 rounded-lg text-sm leading-relaxed break-words ${
               isMine
-                ? 'bg-accent-subtle border border-accent/20 text-ink rounded-tr-sm'
-                : 'bg-surface-3 border border-border text-ink rounded-tl-sm'
+                ? 'bg-accent-subtle border border-accent/20 text-ink rounded-tr-sm font-mono'
+                : 'bg-surface-3 border border-border text-ink rounded-tl-sm font-mono'
             }`}
           >
             <MessageContent text={message.content} />
@@ -247,9 +325,31 @@ export function MessageBubble({ message, showAvatar, isMine }) {
             )}
           </div>
 
-          {/* Action buttons — shown on hover */}
-          <div className={`flex items-center gap-0.5 self-center shrink-0 opacity-0 group-hover:opacity-100 transition-opacity`}>
+          {/* Hover actions */}
+          <div className={`relative flex items-center gap-0.5 self-center shrink-0 opacity-0 group-hover:opacity-100 transition-opacity`}>
             <CopyButton text={message.content} />
+            <button
+              onClick={() => onReply?.(message)}
+              className="text-ink-faint hover:text-ink p-1 rounded transition-colors"
+              title="Reply"
+            >
+              <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                <polyline points="9 17 4 12 9 7"/><path d="M20 18v-2a4 4 0 0 0-4-4H4"/>
+              </svg>
+            </button>
+            <button
+              onClick={() => setShowPicker(v => !v)}
+              className="text-ink-faint hover:text-ink p-1 rounded transition-colors"
+              title="React"
+            >
+              <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                <circle cx="12" cy="12" r="10"/>
+                <path d="M8 13s1.5 2 4 2 4-2 4-2M9 9h.01M15 9h.01"/>
+              </svg>
+            </button>
+            {showPicker && (
+              <EmojiPicker onPick={handleReact} onClose={() => setShowPicker(false)} />
+            )}
             {isMine && (
               <>
                 <button
@@ -279,6 +379,9 @@ export function MessageBubble({ message, showAvatar, isMine }) {
             )}
           </div>
         </div>
+
+        {/* Reactions */}
+        <ReactionBar reactions={message.reactions} messageId={message.id} currentUsername={currentUsername} />
 
         {!showAvatar && (
           <span className="text-2xs text-ink-faint opacity-0 group-hover:opacity-100 transition-opacity mt-0.5">

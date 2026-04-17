@@ -8,6 +8,7 @@ public class ChatMessage {
 
     private Long roomId;
     private String content;
+    private Long replyToId;
 
     // defaults to TEXT, client can override
     private Message.MessageType type = Message.MessageType.TEXT;

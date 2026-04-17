@@ -5,6 +5,7 @@ import { useAuth } from '../../store/authStore'
 import { MessageBubble, DateSeparator } from './MessageBubble'
 import { TypingIndicator } from './TypingIndicator'
 import { MembersPanel } from './MembersPanel'
+import { RoomSettingsModal } from '../rooms/RoomSettingsModal'
 import { Button } from '../shared/Button'
 import { useAutoResize } from '../../hooks/useAutoResize'
 import { toast } from '../shared/Toast'
@@ -20,7 +21,7 @@ function isSameSender(a, b) {
   return a && b && a.senderUsername === b.senderUsername && a.type !== 'SYSTEM' && b.type !== 'SYSTEM'
 }
 
-export function ChatPanel({ room, ws, onMessageRef, onTypingRef, onLeave, onToggleSidebar }) {
+export function ChatPanel({ room, ws, onMessageRef, onTypingRef, onLeave, onToggleSidebar, onRoomUpdated, onRoomDeleted }) {
   const { user } = useAuth()
   const [messages, setMessages]       = useState([])
   const [input, setInput]             = useState('')
@@ -30,6 +31,10 @@ export function ChatPanel({ room, ws, onMessageRef, onTypingRef, onLeave, onTogg
   const [hasMore, setHasMore]         = useState(true)
   const [page, setPage]               = useState(0)
   const [showMembers, setShowMembers] = useState(false)
+  const [showSettings, setShowSettings] = useState(false)
+  const [replyTo, setReplyTo]         = useState(null)
+
+  const isOwner = room.createdBy === user?.username
 
   const bottomRef      = useRef(null)
   const scrollRef      = useRef(null)   // the messages scroll container
@@ -49,6 +54,8 @@ export function ChatPanel({ room, ws, onMessageRef, onTypingRef, onLeave, onTogg
         setMessages(prev => prev.map(m => m.id === msg.id ? { ...m, content: msg.content, editedAt: msg.editedAt } : m))
       } else if (msg.eventType === 'DELETED') {
         setMessages(prev => prev.filter(m => m.id !== msg.id))
+      } else if (msg.eventType === 'REACTION_UPDATE') {
+        setMessages(prev => prev.map(m => m.id === msg.id ? { ...m, reactions: msg.reactions } : m))
       } else {
         setMessages(prev => [...prev, msg])
       }
@@ -155,15 +162,16 @@ export function ChatPanel({ room, ws, onMessageRef, onTypingRef, onLeave, onTogg
     const text = input.trim()
     if (!text) return
     try {
-      ws.sendMessage(room.id, text)
+      ws.sendMessage(room.id, text, replyTo?.id ?? null)
       setInput('')
+      setReplyTo(null)
       isNearBottom.current = true
       isTypingRef.current = false
       ws.sendTyping(room.id, false)
     } catch {
       toast('Failed to send — check your connection')
     }
-  }, [input, room.id, ws])
+  }, [input, room.id, ws, replyTo])
 
   const handleInputChange = (e) => {
     setInput(e.target.value)
@@ -222,6 +230,18 @@ export function ChatPanel({ room, ws, onMessageRef, onTypingRef, onLeave, onTogg
               </svg>
               <span className="hidden sm:inline">{room.memberCount}</span>
             </button>
+            {isOwner && (
+              <button
+                onClick={() => setShowSettings(true)}
+                className="text-ink-faint hover:text-ink transition-colors px-2 py-1 rounded hover:bg-surface-3"
+                title="Room settings"
+              >
+                <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                  <circle cx="12" cy="12" r="3"/>
+                  <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/>
+                </svg>
+              </button>
+            )}
             <button
               onClick={handleLeave}
               className="text-xs text-ink-faint hover:text-danger transition-colors px-2 py-1 rounded hover:bg-danger-subtle"
@@ -275,7 +295,7 @@ export function ChatPanel({ room, ws, onMessageRef, onTypingRef, onLeave, onTogg
                 return (
                   <div key={`${msg.id ?? i}-${i}`}>
                     {showDate && <DateSeparator timestamp={msg.sentAt} />}
-                    <MessageBubble message={msg} showAvatar={showAv} isMine={isMine} />
+                    <MessageBubble message={msg} showAvatar={showAv} isMine={isMine} currentUsername={user?.username} onReply={setReplyTo} />
                   </div>
                 )
               })}
@@ -290,9 +310,26 @@ export function ChatPanel({ room, ws, onMessageRef, onTypingRef, onLeave, onTogg
 
         {/* Input bar */}
         <div className="px-4 pb-4 shrink-0">
+          {replyTo && (
+            <div className="flex items-center gap-2 px-3 py-1.5 mb-1 bg-surface-2 border border-border border-b-0 rounded-t-lg text-xs text-ink-muted">
+              <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className="shrink-0 text-accent">
+                <polyline points="9 17 4 12 9 7"/><path d="M20 18v-2a4 4 0 0 0-4-4H4"/>
+              </svg>
+              <span className="truncate flex-1">
+                <span className="font-medium text-ink">{replyTo.senderDisplayName || replyTo.senderUsername}</span>
+                {': '}
+                <span className="text-ink-faint">{replyTo.content?.slice(0, 80)}{replyTo.content?.length > 80 ? '…' : ''}</span>
+              </span>
+              <button onClick={() => setReplyTo(null)} className="shrink-0 hover:text-ink transition-colors">
+                <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5">
+                  <path d="M18 6 6 18M6 6l12 12"/>
+                </svg>
+              </button>
+            </div>
+          )}
           <form
             onSubmit={handleSend}
-            className="flex items-end gap-2 bg-surface-2 border border-border rounded-lg px-3 py-2.5 focus-within:border-border-strong transition-colors"
+            className={`flex items-end gap-2 bg-surface-2 border border-border focus-within:border-border-strong transition-colors px-3 py-2.5 ${replyTo ? 'rounded-b-lg rounded-t-none border-t-0' : 'rounded-lg'}`}
           >
             <textarea
               ref={inputRef}
@@ -317,6 +354,15 @@ export function ChatPanel({ room, ws, onMessageRef, onTypingRef, onLeave, onTogg
 
       {showMembers && (
         <MembersPanel roomId={room.id} onClose={() => setShowMembers(false)} />
+      )}
+
+      {showSettings && (
+        <RoomSettingsModal
+          room={room}
+          onClose={() => setShowSettings(false)}
+          onUpdated={(updated) => { onRoomUpdated?.(updated); setShowSettings(false) }}
+          onDeleted={(id) => { onRoomDeleted?.(id) }}
+        />
       )}
     </div>
   )

@@ -10,4 +10,6 @@ import org.springframework.stereotype.Repository;
 public interface MessageRepository extends JpaRepository<Message, Long> {
 
     Page<Message> findByRoomIdAndDeletedFalseOrderBySentAtDesc(Long roomId, Pageable pageable);
+
+    void deleteByRoomId(Long roomId);
 }

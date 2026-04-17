@@ -5,6 +5,8 @@ import com.mohitkumar.chatflow.dto.RoomResponse;
 import com.mohitkumar.chatflow.dto.UserProfileResponse;
 import com.mohitkumar.chatflow.model.Room;
 import com.mohitkumar.chatflow.model.User;
+import com.mohitkumar.chatflow.repository.MessageRepository;
+import com.mohitkumar.chatflow.repository.ReactionRepository;
 import com.mohitkumar.chatflow.repository.RoomRepository;
 import com.mohitkumar.chatflow.repository.UserRepository;
 import lombok.RequiredArgsConstructor;
@@ -20,6 +22,8 @@ public class RoomService {
 
     private final RoomRepository roomRepository;
     private final UserRepository userRepository;
+    private final MessageRepository messageRepository;
+    private final ReactionRepository reactionRepository;
 
     @Transactional
     public RoomResponse createRoom(CreateRoomRequest request, String username) {
@@ -99,6 +103,37 @@ public class RoomService {
 
     public RoomResponse getRoomById(Long roomId) {
         return mapToResponse(getRoom(roomId));
+    }
+
+    @Transactional
+    public RoomResponse updateRoom(Long roomId, String newName, String newDescription, String username) {
+        Room room = getRoom(roomId);
+        if (!room.getCreatedBy().getUsername().equals(username)) {
+            throw new RuntimeException("Only the room owner can edit this room");
+        }
+        if (newName != null && !newName.isBlank()) {
+            String trimmed = newName.trim();
+            if (!trimmed.equals(room.getName()) && roomRepository.existsByName(trimmed)) {
+                throw new RuntimeException("Room name already taken");
+            }
+            room.setName(trimmed);
+        }
+        if (newDescription != null) {
+            room.setDescription(newDescription.trim().isEmpty() ? null : newDescription.trim());
+        }
+        roomRepository.save(room);
+        return mapToResponse(room);
+    }
+
+    @Transactional
+    public void deleteRoom(Long roomId, String username) {
+        Room room = getRoom(roomId);
+        if (!room.getCreatedBy().getUsername().equals(username)) {
+            throw new RuntimeException("Only the room owner can delete this room");
+        }
+        reactionRepository.deleteByRoomId(roomId);
+        messageRepository.deleteByRoomId(roomId);
+        roomRepository.delete(room);
     }
 
     @Transactional(readOnly = true)

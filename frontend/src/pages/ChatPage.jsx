@@ -1,4 +1,4 @@
-import { useState, useCallback, useRef } from 'react'
+import { useState, useCallback, useRef, useEffect } from 'react'
 import { Sidebar } from '../components/layout/Sidebar'
 import { ChatPanel } from '../components/chat/ChatPanel'
 import { EmptyState } from '../components/chat/EmptyState'
@@ -8,19 +8,23 @@ import { useAuth } from '../store/authStore'
 export function ChatPage() {
   const { token } = useAuth()
   const [activeRoom, setActiveRoom]   = useState(null)
-  const [unread, setUnread]           = useState({}) // roomId → count
+  const [unread, setUnread]           = useState({})
   const [sidebarOpen, setSidebarOpen] = useState(true)
+  const [sidebarKey, setSidebarKey]   = useState(0) // force sidebar refresh on room delete
 
   const onMessageRef = useRef(null)
   const onTypingRef  = useRef(null)
   const activeRoomId = useRef(null)
 
-  const handleMessage = useCallback((msg) => {
-    // Forward to ChatPanel handler if it's for the active room
-    onMessageRef.current?.(msg)
+  // Update tab title with total unread count
+  useEffect(() => {
+    const total = Object.values(unread).reduce((s, n) => s + n, 0)
+    document.title = total > 0 ? `(${total}) chatflow` : 'chatflow'
+  }, [unread])
 
-    // Increment unread for background rooms (non-SYSTEM messages only)
-    if (msg.type !== 'SYSTEM' && msg.roomId !== activeRoomId.current) {
+  const handleMessage = useCallback((msg) => {
+    onMessageRef.current?.(msg)
+    if (msg.type !== 'SYSTEM' && !msg.eventType && msg.roomId !== activeRoomId.current) {
       setUnread(prev => ({ ...prev, [msg.roomId]: (prev[msg.roomId] ?? 0) + 1 }))
     }
   }, [])
@@ -32,7 +36,6 @@ export function ChatPage() {
   const handleSelectRoom = useCallback((room) => {
     activeRoomId.current = room.id
     setActiveRoom(room)
-    // Clear unread for this room
     setUnread(prev => { const next = { ...prev }; delete next[room.id]; return next })
   }, [])
 
@@ -41,9 +44,22 @@ export function ChatPage() {
     setActiveRoom(null)
   }, [])
 
+  const handleRoomUpdated = useCallback((updated) => {
+    setActiveRoom(updated)
+    setSidebarKey(k => k + 1)
+  }, [])
+
+  const handleRoomDeleted = useCallback((roomId) => {
+    if (activeRoomId.current === roomId) {
+      activeRoomId.current = null
+      setActiveRoom(null)
+    }
+    setUnread(prev => { const next = { ...prev }; delete next[roomId]; return next })
+    setSidebarKey(k => k + 1)
+  }, [])
+
   return (
     <div className="h-full flex bg-surface overflow-hidden">
-      {/* Mobile overlay */}
       {sidebarOpen && (
         <div
           className="fixed inset-0 bg-black/50 z-20 md:hidden"
@@ -53,6 +69,7 @@ export function ChatPage() {
 
       <div className={`${sidebarOpen ? 'translate-x-0' : '-translate-x-full'} md:translate-x-0 fixed md:relative z-30 md:z-auto h-full transition-transform duration-200`}>
         <Sidebar
+          key={sidebarKey}
           activeRoomId={activeRoom?.id}
           onSelectRoom={(room) => { handleSelectRoom(room); setSidebarOpen(false) }}
           wsConnected={ws.connected}
@@ -70,6 +87,8 @@ export function ChatPage() {
             onTypingRef={onTypingRef}
             onLeave={handleLeave}
             onToggleSidebar={() => setSidebarOpen(v => !v)}
+            onRoomUpdated={handleRoomUpdated}
+            onRoomDeleted={handleRoomDeleted}
           />
         ) : (
           <EmptyState onToggleSidebar={() => setSidebarOpen(v => !v)} />

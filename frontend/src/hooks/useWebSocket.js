@@ -101,10 +101,10 @@ export function useWebSocket({ token, onMessage, onTyping }) {
     })
   }, [])
 
-  const sendMessage = useCallback((roomId, content) => {
+  const sendMessage = useCallback((roomId, content, replyToId = null) => {
     clientRef.current?.publish({
       destination: '/app/chat.send',
-      body: JSON.stringify({ roomId, content, type: 'TEXT' }),
+      body: JSON.stringify({ roomId, content, type: 'TEXT', ...(replyToId ? { replyToId } : {}) }),
     })
   }, [])
 
