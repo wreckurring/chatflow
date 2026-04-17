@@ -11,3 +11,6 @@ export const deleteMessage = (id) =>
 
 export const toggleReaction = (id, emoji) =>
   client.post(`/messages/${id}/reactions`, { emoji }).then(r => r.data)
+
+export const searchMessages = (roomId, q) =>
+  client.get(`/messages/room/${roomId}/search?q=${encodeURIComponent(q)}`).then(r => r.data)

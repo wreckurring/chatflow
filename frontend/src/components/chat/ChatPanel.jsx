@@ -1,10 +1,12 @@
 import { useState, useEffect, useRef, useCallback } from 'react'
 import { getRoomHistory } from '../../api/messages'
-import { leaveRoom as apiLeaveRoom } from '../../api/rooms'
+import { leaveRoom as apiLeaveRoom, getRoomMembers } from '../../api/rooms'
 import { useAuth } from '../../store/authStore'
 import { MessageBubble, DateSeparator } from './MessageBubble'
 import { TypingIndicator } from './TypingIndicator'
 import { MembersPanel } from './MembersPanel'
+import { SearchPanel } from './SearchPanel'
+import { MentionDropdown, detectMentionTrigger } from './MentionDropdown'
 import { RoomSettingsModal } from '../rooms/RoomSettingsModal'
 import { Button } from '../shared/Button'
 import { useAutoResize } from '../../hooks/useAutoResize'
@@ -32,7 +34,11 @@ export function ChatPanel({ room, ws, onMessageRef, onTypingRef, onLeave, onTogg
   const [page, setPage]               = useState(0)
   const [showMembers, setShowMembers] = useState(false)
   const [showSettings, setShowSettings] = useState(false)
+  const [showSearch, setShowSearch]   = useState(false)
   const [replyTo, setReplyTo]         = useState(null)
+  const [members, setMembers]         = useState([])
+  const [mention, setMention]         = useState(null)   // { query, start, end }
+  const [mentionIdx, setMentionIdx]   = useState(0)
 
   const isOwner = room.createdBy === user?.username
 
@@ -76,6 +82,11 @@ export function ChatPanel({ room, ws, onMessageRef, onTypingRef, onLeave, onTogg
     }
     return () => { onMessageRef.current = null; onTypingRef.current = null }
   }, [room.id, user?.username, onMessageRef, onTypingRef])
+
+  // Load members for @mention autocomplete
+  useEffect(() => {
+    getRoomMembers(room.id).then(setMembers).catch(() => {})
+  }, [room.id])
 
   // Load initial history + join room
   useEffect(() => {
@@ -165,6 +176,7 @@ export function ChatPanel({ room, ws, onMessageRef, onTypingRef, onLeave, onTogg
       ws.sendMessage(room.id, text, replyTo?.id ?? null)
       setInput('')
       setReplyTo(null)
+      setMention(null)
       isNearBottom.current = true
       isTypingRef.current = false
       ws.sendTyping(room.id, false)
@@ -174,7 +186,15 @@ export function ChatPanel({ room, ws, onMessageRef, onTypingRef, onLeave, onTogg
   }, [input, room.id, ws, replyTo])
 
   const handleInputChange = (e) => {
-    setInput(e.target.value)
+    const val = e.target.value
+    setInput(val)
+
+    // @mention detection
+    const cursor = e.target.selectionStart
+    const trigger = detectMentionTrigger(val, cursor)
+    setMention(trigger)
+    setMentionIdx(0)
+
     if (!isTypingRef.current) {
       isTypingRef.current = true
       ws.sendTyping(room.id, true)
@@ -186,7 +206,34 @@ export function ChatPanel({ room, ws, onMessageRef, onTypingRef, onLeave, onTogg
     }, 2000)
   }
 
+  const filteredMembers = mention
+    ? members.filter(m =>
+        m.username.toLowerCase().startsWith(mention.query.toLowerCase()) ||
+        (m.displayName && m.displayName.toLowerCase().startsWith(mention.query.toLowerCase()))
+      ).slice(0, 6)
+    : []
+
+  const completeMention = (member) => {
+    if (!mention) return
+    const before = input.slice(0, mention.start)
+    const after  = input.slice(mention.end)
+    const completed = `${before}@${member.username} ${after}`
+    setInput(completed)
+    setMention(null)
+    inputRef.current?.focus()
+  }
+
   const handleKeyDown = (e) => {
+    if (mention && filteredMembers.length > 0) {
+      if (e.key === 'ArrowDown') { e.preventDefault(); setMentionIdx(i => Math.min(i + 1, filteredMembers.length - 1)); return }
+      if (e.key === 'ArrowUp')   { e.preventDefault(); setMentionIdx(i => Math.max(i - 1, 0)); return }
+      if (e.key === 'Tab' || (e.key === 'Enter' && mention)) {
+        e.preventDefault()
+        completeMention(filteredMembers[mentionIdx])
+        return
+      }
+      if (e.key === 'Escape') { setMention(null); return }
+    }
     if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); handleSend() }
   }
 
@@ -229,6 +276,15 @@ export function ChatPanel({ room, ws, onMessageRef, onTypingRef, onLeave, onTogg
                 <path d="M23 21v-2a4 4 0 0 0-3-3.87M16 3.13a4 4 0 0 1 0 7.75"/>
               </svg>
               <span className="hidden sm:inline">{room.memberCount}</span>
+            </button>
+            <button
+              onClick={() => setShowSearch(v => !v)}
+              className={`text-ink-faint hover:text-ink transition-colors px-2 py-1 rounded hover:bg-surface-3 ${showSearch ? 'text-accent bg-accent-subtle' : ''}`}
+              title="Search messages"
+            >
+              <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                <circle cx="11" cy="11" r="8"/><path d="m21 21-4.35-4.35"/>
+              </svg>
             </button>
             {isOwner && (
               <button
@@ -309,7 +365,15 @@ export function ChatPanel({ room, ws, onMessageRef, onTypingRef, onLeave, onTogg
         <TypingIndicator typists={typists} />
 
         {/* Input bar */}
-        <div className="px-4 pb-4 shrink-0">
+        <div className="px-4 pb-4 shrink-0 relative">
+          {mention && filteredMembers.length > 0 && (
+            <MentionDropdown
+              members={filteredMembers}
+              filter={mention.query}
+              onSelect={completeMention}
+              activeIndex={mentionIdx}
+            />
+          )}
           {replyTo && (
             <div className="flex items-center gap-2 px-3 py-1.5 mb-1 bg-surface-2 border border-border border-b-0 rounded-t-lg text-xs text-ink-muted">
               <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className="shrink-0 text-accent">
@@ -354,6 +418,10 @@ export function ChatPanel({ room, ws, onMessageRef, onTypingRef, onLeave, onTogg
 
       {showMembers && (
         <MembersPanel roomId={room.id} onClose={() => setShowMembers(false)} />
+      )}
+
+      {showSearch && (
+        <SearchPanel roomId={room.id} roomName={room.name} onClose={() => setShowSearch(false)} />
       )}
 
       {showSettings && (

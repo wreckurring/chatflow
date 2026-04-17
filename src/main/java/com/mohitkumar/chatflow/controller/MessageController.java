@@ -29,6 +29,13 @@ public class MessageController {
         return ResponseEntity.ok(messageService.getRoomHistory(roomId, page, size));
     }
 
+    @GetMapping("/room/{roomId}/search")
+    public ResponseEntity<List<MessageResponse>> searchMessages(
+            @PathVariable Long roomId,
+            @RequestParam String q) {
+        return ResponseEntity.ok(messageService.searchMessages(roomId, q));
+    }
+
     @PatchMapping("/{id}")
     public ResponseEntity<MessageResponse> editMessage(
             @PathVariable Long id,

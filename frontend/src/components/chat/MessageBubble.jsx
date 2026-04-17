@@ -124,7 +124,7 @@ function CopyButton({ text }) {
 }
 
 // Markdown + code rendering
-function MessageContent({ text }) {
+function MessageContent({ text, currentUsername }) {
   const parts = []
   const blockRe = /```([\s\S]*?)```/g
   let last = 0, match
@@ -146,15 +146,15 @@ function MessageContent({ text }) {
             </pre>
           )
         }
-        return <InlineMarkdown key={i} text={part.value} />
+        return <InlineMarkdown key={i} text={part.value} currentUsername={currentUsername} />
       })}
     </>
   )
 }
 
-function InlineMarkdown({ text }) {
-  // Parse inline tokens: `code`, **bold**, *italic*, ~~strike~~, [text](url)
-  const tokenRe = /(`[^`]+`|\*\*[^*]+\*\*|\*[^*]+\*|~~[^~]+~~|\[[^\]]+\]\([^)]+\))/g
+function InlineMarkdown({ text, currentUsername }) {
+  // Parse inline tokens: `code`, **bold**, *italic*, ~~strike~~, [text](url), @mention
+  const tokenRe = /(`[^`]+`|\*\*[^*]+\*\*|\*[^*]+\*|~~[^~]+~~|\[[^\]]+\]\([^)]+\)|@\w+)/g
   const segments = text.split(tokenRe)
 
   return (
@@ -179,6 +179,17 @@ function InlineMarkdown({ text }) {
                className="text-accent underline underline-offset-2 hover:text-accent/80">
               {linkMatch[1]}
             </a>
+          )
+        }
+        if (seg.startsWith('@') && seg.length > 1) {
+          const mentioned = seg.slice(1)
+          const isMe = currentUsername && mentioned.toLowerCase() === currentUsername.toLowerCase()
+          return (
+            <span key={i} className={`rounded px-0.5 font-medium ${
+              isMe ? 'bg-accent/20 text-accent' : 'bg-surface text-ink-muted'
+            }`}>
+              {seg}
+            </span>
           )
         }
         return <span key={i}>{seg}</span>
@@ -319,7 +330,7 @@ export function MessageBubble({ message, showAvatar, isMine, currentUsername, on
                 : 'bg-surface-3 border border-border text-ink rounded-tl-sm font-mono'
             }`}
           >
-            <MessageContent text={message.content} />
+            <MessageContent text={message.content} currentUsername={currentUsername} />
             {message.editedAt && (
               <span className="text-2xs text-ink-faint ml-1">(edited)</span>
             )}

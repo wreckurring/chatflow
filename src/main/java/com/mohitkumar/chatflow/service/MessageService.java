@@ -146,6 +146,14 @@ public class MessageService {
         return responses;
     }
 
+    public List<MessageResponse> searchMessages(Long roomId, String query) {
+        if (query == null || query.isBlank()) return Collections.emptyList();
+        return messageRepository.searchByRoomIdAndContent(roomId, query.trim(), PageRequest.of(0, 30))
+                .stream()
+                .map(this::mapToResponse)
+                .collect(Collectors.toList());
+    }
+
     @Transactional
     public MessageResponse editMessage(Long messageId, String newContent, String username) {
         Message message = messageRepository.findById(messageId)
