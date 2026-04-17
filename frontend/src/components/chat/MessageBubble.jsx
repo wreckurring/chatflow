@@ -1,3 +1,4 @@
+import { useState, useCallback } from 'react'
 import { Avatar } from '../shared/Avatar'
 
 function formatTime(ts) {
@@ -18,7 +19,7 @@ function formatDate(ts) {
 
 export function DateSeparator({ timestamp }) {
   return (
-    <div className="flex items-center gap-3 my-4">
+    <div className="flex items-center gap-3 my-4 px-4">
       <div className="flex-1 h-px bg-border" />
       <span className="text-2xs text-ink-faint bg-surface-2 px-2 py-0.5 rounded-full">
         {formatDate(timestamp)}
@@ -33,6 +34,35 @@ export function SystemMessage({ content }) {
     <div className="flex justify-center my-1">
       <span className="text-2xs text-ink-faint italic px-2">{content}</span>
     </div>
+  )
+}
+
+function CopyButton({ text }) {
+  const [copied, setCopied] = useState(false)
+
+  const handleCopy = useCallback(async (e) => {
+    e.stopPropagation()
+    await navigator.clipboard.writeText(text).catch(() => {})
+    setCopied(true)
+    setTimeout(() => setCopied(false), 1500)
+  }, [text])
+
+  return (
+    <button
+      onClick={handleCopy}
+      className="opacity-0 group-hover:opacity-100 transition-opacity text-ink-faint hover:text-ink p-1 rounded"
+      title="Copy"
+    >
+      {copied ? (
+        <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="#10B981" strokeWidth="2.5">
+          <polyline points="20 6 9 17 4 12"/>
+        </svg>
+      ) : (
+        <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+          <rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/>
+        </svg>
+      )}
+    </button>
   )
 }
 
@@ -52,15 +82,23 @@ export function MessageBubble({ message, showAvatar, isMine }) {
             <span className="text-2xs text-ink-faint">{formatTime(message.sentAt)}</span>
           </div>
         )}
-        <div
-          className={`px-3 py-2 rounded-lg text-sm font-mono leading-relaxed break-words ${
-            isMine
-              ? 'bg-accent-subtle border border-accent/20 text-ink rounded-tr-sm'
-              : 'bg-surface-3 border border-border text-ink rounded-tl-sm'
-          }`}
-        >
-          {message.content}
+
+        {/* Bubble + copy button row */}
+        <div className={`flex items-start gap-1.5 ${isMine ? 'flex-row-reverse' : ''}`}>
+          <div
+            className={`px-3 py-2 rounded-lg text-sm font-mono leading-relaxed break-words ${
+              isMine
+                ? 'bg-accent-subtle border border-accent/20 text-ink rounded-tr-sm'
+                : 'bg-surface-3 border border-border text-ink rounded-tl-sm'
+            }`}
+          >
+            {message.content}
+          </div>
+          <div className="self-center shrink-0">
+            <CopyButton text={message.content} />
+          </div>
         </div>
+
         {!showAvatar && (
           <span className="text-2xs text-ink-faint opacity-0 group-hover:opacity-100 transition-opacity mt-0.5">
             {formatTime(message.sentAt)}

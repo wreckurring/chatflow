@@ -3,12 +3,13 @@ package com.mohitkumar.chatflow.controller;
 import com.mohitkumar.chatflow.dto.UserProfileResponse;
 import com.mohitkumar.chatflow.model.User;
 import com.mohitkumar.chatflow.repository.UserRepository;
+import jakarta.validation.constraints.NotBlank;
+import jakarta.validation.constraints.Size;
+import lombok.Data;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
-import org.springframework.web.bind.annotation.GetMapping;
-import org.springframework.web.bind.annotation.PathVariable;
-import org.springframework.web.bind.annotation.RequestMapping;
-import org.springframework.web.bind.annotation.RestController;
+import org.springframework.transaction.annotation.Transactional;
+import org.springframework.web.bind.annotation.*;
 
 import java.security.Principal;
 
@@ -21,16 +22,27 @@ public class UserController {
 
     @GetMapping("/me")
     public ResponseEntity<UserProfileResponse> getCurrentUser(Principal principal) {
-        User user = userRepository.findByUsername(principal.getName())
-                .orElseThrow(() -> new RuntimeException("User not found"));
+        User user = getUser(principal.getName());
+        return ResponseEntity.ok(toResponse(user));
+    }
+
+    @PatchMapping("/me")
+    @Transactional
+    public ResponseEntity<UserProfileResponse> updateProfile(@RequestBody UpdateProfileRequest body, Principal principal) {
+        User user = getUser(principal.getName());
+        user.setDisplayName(body.getDisplayName().trim());
+        userRepository.save(user);
         return ResponseEntity.ok(toResponse(user));
     }
 
     @GetMapping("/{username}")
     public ResponseEntity<UserProfileResponse> getUserByUsername(@PathVariable String username) {
-        User user = userRepository.findByUsername(username)
+        return ResponseEntity.ok(toResponse(getUser(username)));
+    }
+
+    private User getUser(String username) {
+        return userRepository.findByUsername(username)
                 .orElseThrow(() -> new RuntimeException("User not found"));
-        return ResponseEntity.ok(toResponse(user));
     }
 
     private UserProfileResponse toResponse(User user) {
@@ -41,5 +53,12 @@ public class UserController {
                 .displayName(user.getDisplayName())
                 .createdAt(user.getCreatedAt())
                 .build();
+    }
+
+    @Data
+    public static class UpdateProfileRequest {
+        @NotBlank
+        @Size(max = 50)
+        private String displayName;
     }
 }

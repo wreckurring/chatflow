@@ -4,6 +4,7 @@ import { getOnlinePresence } from '../../api/presence'
 import { useAuth } from '../../store/authStore'
 import { Avatar } from '../shared/Avatar'
 import { CreateRoomModal } from '../rooms/CreateRoomModal'
+import { ProfileModal } from '../shared/ProfileModal'
 
 export function Sidebar({ activeRoomId, onSelectRoom, wsConnected, unread = {} }) {
   const { user, signOut } = useAuth()
@@ -13,7 +14,8 @@ export function Sidebar({ activeRoomId, onSelectRoom, wsConnected, unread = {} }
   const [search, setSearch] = useState('')
   const [searchResults, setSearchResults] = useState(null)
   const [showCreate, setShowCreate] = useState(false)
-  const [joining, setJoining] = useState(null)
+  const [joining, setJoining]       = useState(null)
+  const [showProfile, setShowProfile] = useState(false)
   const searchRef = useRef(null)
 
   useEffect(() => {
@@ -196,14 +198,19 @@ export function Sidebar({ activeRoomId, onSelectRoom, wsConnected, unread = {} }
 
       {/* User footer */}
       <div className="border-t border-border px-3 py-2.5 flex items-center gap-2.5">
-        <Avatar name={user?.displayName || user?.username} size="sm" />
-        <div className="flex-1 min-w-0">
-          <p className="text-xs font-medium text-ink truncate">{user?.displayName}</p>
-          <p className="text-2xs text-ink-muted truncate">@{user?.username}</p>
-        </div>
+        <button
+          onClick={() => setShowProfile(true)}
+          className="flex items-center gap-2.5 flex-1 min-w-0 text-left hover:opacity-80 transition-opacity"
+        >
+          <Avatar name={user?.displayName || user?.username} size="sm" />
+          <div className="flex-1 min-w-0">
+            <p className="text-xs font-medium text-ink truncate">{user?.displayName}</p>
+            <p className="text-2xs text-ink-muted truncate">@{user?.username}</p>
+          </div>
+        </button>
         <button
           onClick={signOut}
-          className="text-ink-faint hover:text-danger transition-colors"
+          className="text-ink-faint hover:text-danger transition-colors shrink-0"
           title="Sign out"
         >
           <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
@@ -217,6 +224,9 @@ export function Sidebar({ activeRoomId, onSelectRoom, wsConnected, unread = {} }
           onClose={() => setShowCreate(false)}
           onCreated={(room) => { loadRooms(); onSelectRoom(room) }}
         />
+      )}
+      {showProfile && (
+        <ProfileModal onClose={() => setShowProfile(false)} />
       )}
     </aside>
   )
