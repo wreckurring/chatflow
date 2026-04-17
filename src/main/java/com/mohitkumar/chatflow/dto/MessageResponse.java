@@ -21,4 +21,11 @@ public class MessageResponse {
     private Long roomId;
     private Message.MessageType type;
     private LocalDateTime sentAt;
+    private LocalDateTime editedAt;
+    private boolean deleted;
+    private EventType eventType;
+
+    public enum EventType {
+        SENT, EDITED, DELETED
+    }
 }

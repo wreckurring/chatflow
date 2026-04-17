@@ -106,7 +106,7 @@ public class MessageService {
             }
         }
 
-        Page<Message> messages = messageRepository.findByRoomIdOrderBySentAtDesc(roomId, PageRequest.of(page, size));
+        Page<Message> messages = messageRepository.findByRoomIdAndDeletedFalseOrderBySentAtDesc(roomId, PageRequest.of(page, size));
         List<MessageResponse> responseList = messages.getContent().stream()
                 .map(this::mapToResponse)
                 .collect(Collectors.toList());
@@ -127,6 +127,44 @@ public class MessageService {
         return responses;
     }
 
+    @Transactional
+    public MessageResponse editMessage(Long messageId, String newContent, String username) {
+        Message message = messageRepository.findById(messageId)
+                .orElseThrow(() -> new RuntimeException("Message not found"));
+        if (!message.getSender().getUsername().equals(username)) {
+            throw new RuntimeException("Not authorized to edit this message");
+        }
+        if (message.isDeleted()) {
+            throw new RuntimeException("Cannot edit a deleted message");
+        }
+        message.setContent(newContent.trim());
+        message.setEditedAt(LocalDateTime.now());
+        messageRepository.save(message);
+        evictRoomCache(message.getRoom().getId());
+        MessageResponse response = mapToResponse(message);
+        response.setEventType(MessageResponse.EventType.EDITED);
+        return response;
+    }
+
+    @Transactional
+    public MessageResponse deleteMessage(Long messageId, String username) {
+        Message message = messageRepository.findById(messageId)
+                .orElseThrow(() -> new RuntimeException("Message not found"));
+        if (!message.getSender().getUsername().equals(username)) {
+            throw new RuntimeException("Not authorized to delete this message");
+        }
+        message.setDeleted(true);
+        messageRepository.save(message);
+        evictRoomCache(message.getRoom().getId());
+        MessageResponse response = mapToResponse(message);
+        response.setEventType(MessageResponse.EventType.DELETED);
+        return response;
+    }
+
+    private void evictRoomCache(Long roomId) {
+        redisTemplate.delete(CACHE_KEY_PREFIX + roomId);
+    }
+
     private MessageResponse mapToResponse(Message message) {
         return MessageResponse.builder()
                 .id(message.getId())
@@ -136,6 +174,8 @@ public class MessageService {
                 .roomId(message.getRoom().getId())
                 .type(message.getType())
                 .sentAt(message.getSentAt())
+                .editedAt(message.getEditedAt())
+                .deleted(message.isDeleted())
                 .build();
     }
 }

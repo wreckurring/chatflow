@@ -41,6 +41,13 @@ public class Message {
     @Column(name = "sent_at", updatable = false)
     private LocalDateTime sentAt;
 
+    @Column(name = "edited_at")
+    private LocalDateTime editedAt;
+
+    @Column(nullable = false)
+    @Builder.Default
+    private boolean deleted = false;
+
     public enum MessageType {
         TEXT, IMAGE, FILE, SYSTEM
     }

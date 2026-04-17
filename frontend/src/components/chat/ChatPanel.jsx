@@ -45,7 +45,13 @@ export function ChatPanel({ room, ws, onMessageRef, onTypingRef, onLeave, onTogg
   useEffect(() => {
     onMessageRef.current = (msg) => {
       if (msg.roomId !== room.id) return
-      setMessages(prev => [...prev, msg])
+      if (msg.eventType === 'EDITED') {
+        setMessages(prev => prev.map(m => m.id === msg.id ? { ...m, content: msg.content, editedAt: msg.editedAt } : m))
+      } else if (msg.eventType === 'DELETED') {
+        setMessages(prev => prev.filter(m => m.id !== msg.id))
+      } else {
+        setMessages(prev => [...prev, msg])
+      }
     }
     onTypingRef.current = (event) => {
       if (event.username === user?.username) return

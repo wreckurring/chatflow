@@ -9,6 +9,5 @@ import org.springframework.stereotype.Repository;
 @Repository
 public interface MessageRepository extends JpaRepository<Message, Long> {
 
-    // paginated so we don't load entire history at once
-    Page<Message> findByRoomIdOrderBySentAtDesc(Long roomId, Pageable pageable);
+    Page<Message> findByRoomIdAndDeletedFalseOrderBySentAtDesc(Long roomId, Pageable pageable);
 }
