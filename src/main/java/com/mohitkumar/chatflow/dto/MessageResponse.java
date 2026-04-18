@@ -28,10 +28,11 @@ public class MessageResponse {
     private String replyToContent;
     private String replyToSenderUsername;
     private String replyToSenderDisplayName;
+    private boolean pinned;
     // emoji → list of usernames who reacted
     private java.util.Map<String, java.util.List<String>> reactions;
 
     public enum EventType {
-        SENT, EDITED, DELETED, REACTION_UPDATE
+        SENT, EDITED, DELETED, REACTION_UPDATE, PIN_UPDATE
     }
 }

@@ -1,6 +1,7 @@
 package com.mohitkumar.chatflow.controller;
 
 import com.mohitkumar.chatflow.dto.CreateRoomRequest;
+import com.mohitkumar.chatflow.dto.MessageResponse;
 import com.mohitkumar.chatflow.dto.RoomResponse;
 import com.mohitkumar.chatflow.dto.UserProfileResponse;
 import com.mohitkumar.chatflow.service.RoomService;
@@ -9,6 +10,7 @@ import jakarta.validation.constraints.Size;
 import lombok.Data;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
+import org.springframework.messaging.simp.SimpMessagingTemplate;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.security.core.userdetails.UserDetails;
 import org.springframework.web.bind.annotation.*;
@@ -21,6 +23,7 @@ import java.util.List;
 public class RoomController {
 
     private final RoomService roomService;
+    private final SimpMessagingTemplate messagingTemplate;
 
     @PostMapping
     public ResponseEntity<RoomResponse> createRoom(
@@ -84,6 +87,21 @@ public class RoomController {
             @AuthenticationPrincipal UserDetails userDetails) {
         roomService.deleteRoom(roomId, userDetails.getUsername());
         return ResponseEntity.noContent().build();
+    }
+
+    @GetMapping("/{roomId}/pins")
+    public ResponseEntity<List<MessageResponse>> getPinnedMessages(@PathVariable Long roomId) {
+        return ResponseEntity.ok(roomService.getPinnedMessages(roomId));
+    }
+
+    @PostMapping("/{roomId}/pins/{messageId}")
+    public ResponseEntity<Void> togglePin(
+            @PathVariable Long roomId,
+            @PathVariable Long messageId,
+            @AuthenticationPrincipal UserDetails userDetails) {
+        MessageResponse event = roomService.togglePin(roomId, messageId, userDetails.getUsername());
+        messagingTemplate.convertAndSend("/topic/room/" + roomId, event);
+        return ResponseEntity.ok().build();
     }
 
     @Data

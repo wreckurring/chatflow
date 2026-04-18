@@ -10,3 +10,5 @@ export const searchRooms   = (q) => client.get(`/rooms/search?q=${encodeURICompo
 export const getRoomMembers = (id) => client.get(`/rooms/${id}/members`).then(r => r.data)
 export const updateRoom = (id, data) => client.patch(`/rooms/${id}`, data).then(r => r.data)
 export const deleteRoom = (id) => client.delete(`/rooms/${id}`)
+export const getPinnedMessages = (id) => client.get(`/rooms/${id}/pins`).then(r => r.data)
+export const togglePin = (roomId, messageId) => client.post(`/rooms/${roomId}/pins/${messageId}`)

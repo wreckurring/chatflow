@@ -1,11 +1,15 @@
 package com.mohitkumar.chatflow.service;
 
 import com.mohitkumar.chatflow.dto.CreateRoomRequest;
+import com.mohitkumar.chatflow.dto.MessageResponse;
 import com.mohitkumar.chatflow.dto.RoomResponse;
 import com.mohitkumar.chatflow.dto.UserProfileResponse;
+import com.mohitkumar.chatflow.model.Message;
+import com.mohitkumar.chatflow.model.PinnedMessage;
 import com.mohitkumar.chatflow.model.Room;
 import com.mohitkumar.chatflow.model.User;
 import com.mohitkumar.chatflow.repository.MessageRepository;
+import com.mohitkumar.chatflow.repository.PinnedMessageRepository;
 import com.mohitkumar.chatflow.repository.ReactionRepository;
 import com.mohitkumar.chatflow.repository.RoomRepository;
 import com.mohitkumar.chatflow.repository.UserRepository;
@@ -26,6 +30,7 @@ public class RoomService {
     private final UserRepository userRepository;
     private final MessageRepository messageRepository;
     private final ReactionRepository reactionRepository;
+    private final PinnedMessageRepository pinnedMessageRepository;
 
     @Transactional
     public RoomResponse createRoom(CreateRoomRequest request, String username) {
@@ -159,9 +164,56 @@ public class RoomService {
         if (!room.getCreatedBy().getUsername().equals(username)) {
             throw new RuntimeException("Only the room owner can delete this room");
         }
+        pinnedMessageRepository.deleteByRoomId(roomId);
         reactionRepository.deleteByRoomId(roomId);
         messageRepository.deleteByRoomId(roomId);
         roomRepository.delete(room);
+    }
+
+    @Transactional
+    public MessageResponse togglePin(Long roomId, Long messageId, String username) {
+        Room room = getRoom(roomId);
+        if (!room.getMembers().stream().anyMatch(m -> m.getUsername().equals(username))) {
+            throw new RuntimeException("Must be a room member to pin messages");
+        }
+        Message message = messageRepository.findById(messageId)
+                .orElseThrow(() -> new RuntimeException("Message not found"));
+
+        Optional<PinnedMessage> existing = pinnedMessageRepository.findByRoomIdAndMessageId(roomId, messageId);
+        if (existing.isPresent()) {
+            pinnedMessageRepository.delete(existing.get());
+            return MessageResponse.builder()
+                    .id(messageId).roomId(roomId)
+                    .eventType(MessageResponse.EventType.PIN_UPDATE)
+                    .pinned(false).build();
+        } else {
+            pinnedMessageRepository.save(PinnedMessage.builder()
+                    .room(room).message(message).pinnedBy(username).build());
+            return MessageResponse.builder()
+                    .id(messageId).roomId(roomId)
+                    .eventType(MessageResponse.EventType.PIN_UPDATE)
+                    .pinned(true).build();
+        }
+    }
+
+    @Transactional(readOnly = true)
+    public List<MessageResponse> getPinnedMessages(Long roomId) {
+        return pinnedMessageRepository.findByRoomIdOrderByPinnedAtDesc(roomId)
+                .stream()
+                .map(pm -> {
+                    Message m = pm.getMessage();
+                    return MessageResponse.builder()
+                            .id(m.getId())
+                            .content(m.isDeleted() ? null : m.getContent())
+                            .senderUsername(m.getSender().getUsername())
+                            .senderDisplayName(m.getSender().getDisplayName())
+                            .roomId(roomId)
+                            .type(m.getType())
+                            .sentAt(m.getSentAt())
+                            .pinned(true)
+                            .build();
+                })
+                .toList();
     }
 
     @Transactional(readOnly = true)

@@ -6,6 +6,7 @@ import { MessageBubble, DateSeparator } from './MessageBubble'
 import { TypingIndicator } from './TypingIndicator'
 import { MembersPanel } from './MembersPanel'
 import { SearchPanel } from './SearchPanel'
+import { PinnedMessagesPanel } from './PinnedMessagesPanel'
 import { MentionDropdown, detectMentionTrigger } from './MentionDropdown'
 import { openDm } from '../../api/users'
 import { RoomSettingsModal } from '../rooms/RoomSettingsModal'
@@ -36,6 +37,8 @@ export function ChatPanel({ room, ws, onMessageRef, onTypingRef, onLeave, onTogg
   const [showMembers, setShowMembers] = useState(false)
   const [showSettings, setShowSettings] = useState(false)
   const [showSearch, setShowSearch]   = useState(false)
+  const [showPins, setShowPins]       = useState(false)
+  const [pinCount, setPinCount]       = useState(0)
   const [replyTo, setReplyTo]         = useState(null)
   const [members, setMembers]         = useState([])
   const [mention, setMention]         = useState(null)   // { query, start, end }
@@ -63,6 +66,9 @@ export function ChatPanel({ room, ws, onMessageRef, onTypingRef, onLeave, onTogg
         setMessages(prev => prev.filter(m => m.id !== msg.id))
       } else if (msg.eventType === 'REACTION_UPDATE') {
         setMessages(prev => prev.map(m => m.id === msg.id ? { ...m, reactions: msg.reactions } : m))
+      } else if (msg.eventType === 'PIN_UPDATE') {
+        setMessages(prev => prev.map(m => m.id === msg.id ? { ...m, pinned: msg.pinned } : m))
+        setPinCount(prev => msg.pinned ? prev + 1 : Math.max(0, prev - 1))
       } else {
         setMessages(prev => [...prev, msg])
       }
@@ -283,6 +289,18 @@ export function ChatPanel({ room, ws, onMessageRef, onTypingRef, onLeave, onTogg
               <span className="hidden sm:inline">{room.memberCount}</span>
             </button>
             <button
+              onClick={() => setShowPins(v => !v)}
+              className={`relative flex items-center gap-1 text-ink-faint hover:text-ink transition-colors px-2 py-1 rounded hover:bg-surface-3 ${showPins ? 'text-accent bg-accent-subtle' : ''}`}
+              title="Pinned messages"
+            >
+              <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                <line x1="12" y1="17" x2="12" y2="22"/><path d="M5 17h14v-1.76a2 2 0 0 0-1.11-1.79l-1.78-.9A2 2 0 0 1 15 10.76V6h1a2 2 0 0 0 0-4H8a2 2 0 0 0 0 4h1v4.76a2 2 0 0 1-1.11 1.79l-1.78.9A2 2 0 0 0 5 15.24V17z"/>
+              </svg>
+              {pinCount > 0 && (
+                <span className="text-2xs font-semibold text-accent">{pinCount}</span>
+              )}
+            </button>
+            <button
               onClick={() => setShowSearch(v => !v)}
               className={`text-ink-faint hover:text-ink transition-colors px-2 py-1 rounded hover:bg-surface-3 ${showSearch ? 'text-accent bg-accent-subtle' : ''}`}
               title="Search messages"
@@ -358,7 +376,7 @@ export function ChatPanel({ room, ws, onMessageRef, onTypingRef, onLeave, onTogg
                 return (
                   <div key={`${msg.id ?? i}-${i}`}>
                     {showDate && <DateSeparator timestamp={msg.sentAt} />}
-                    <MessageBubble message={msg} showAvatar={showAv} isMine={isMine} currentUsername={user?.username} onReply={setReplyTo} />
+                    <MessageBubble message={msg} showAvatar={showAv} isMine={isMine} currentUsername={user?.username} onReply={setReplyTo} roomId={room.id} />
                   </div>
                 )
               })}
@@ -441,6 +459,14 @@ export function ChatPanel({ room, ws, onMessageRef, onTypingRef, onLeave, onTogg
 
       {showSearch && (
         <SearchPanel roomId={room.id} roomName={room.name} onClose={() => setShowSearch(false)} />
+      )}
+
+      {showPins && (
+        <PinnedMessagesPanel
+          roomId={room.id}
+          onClose={() => setShowPins(false)}
+          onUnpin={() => setPinCount(c => Math.max(0, c - 1))}
+        />
       )}
 
       {showSettings && (

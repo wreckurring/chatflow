@@ -1,6 +1,7 @@
 import { useState, useCallback, useRef, useEffect } from 'react'
 import { Avatar } from '../shared/Avatar'
 import { editMessage, deleteMessage, toggleReaction } from '../../api/messages'
+import { togglePin } from '../../api/rooms'
 import { toast } from '../shared/Toast'
 
 function formatTime(ts) {
@@ -253,10 +254,11 @@ function InlineEditor({ messageId, initialContent, isMine, onDone }) {
   )
 }
 
-export function MessageBubble({ message, showAvatar, isMine, currentUsername, onReply }) {
+export function MessageBubble({ message, showAvatar, isMine, currentUsername, onReply, roomId }) {
   const [editing, setEditing] = useState(false)
   const [deleting, setDeleting] = useState(false)
   const [showPicker, setShowPicker] = useState(false)
+  const [pinned, setPinned] = useState(message.pinned ?? false)
 
   if (message.type === 'SYSTEM') return <SystemMessage content={message.content} />
 
@@ -360,6 +362,21 @@ export function MessageBubble({ message, showAvatar, isMine, currentUsername, on
             </button>
             {showPicker && (
               <EmojiPicker onPick={handleReact} onClose={() => setShowPicker(false)} />
+            )}
+            {roomId && (
+              <button
+                onClick={async (e) => {
+                  e.stopPropagation()
+                  try { await togglePin(roomId, message.id); setPinned(v => !v) }
+                  catch { toast('Failed to pin message') }
+                }}
+                className={`p-1 rounded transition-colors ${pinned ? 'text-accent' : 'text-ink-faint hover:text-ink'}`}
+                title={pinned ? 'Unpin' : 'Pin'}
+              >
+                <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                  <line x1="12" y1="17" x2="12" y2="22"/><path d="M5 17h14v-1.76a2 2 0 0 0-1.11-1.79l-1.78-.9A2 2 0 0 1 15 10.76V6h1a2 2 0 0 0 0-4H8a2 2 0 0 0 0 4h1v4.76a2 2 0 0 1-1.11 1.79l-1.78.9A2 2 0 0 0 5 15.24V17z"/>
+                </svg>
+              </button>
             )}
             {isMine && (
               <>
