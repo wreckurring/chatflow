@@ -21,4 +21,7 @@ public class RoomResponse {
     private String createdBy;
     private int memberCount;
     private LocalDateTime createdAt;
+    // Populated only for DIRECT rooms — the other participant
+    private String otherUsername;
+    private String otherDisplayName;
 }

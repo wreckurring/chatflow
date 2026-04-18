@@ -13,8 +13,10 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.util.Arrays;
 import java.util.Comparator;
 import java.util.List;
+import java.util.Optional;
 
 @Service
 @RequiredArgsConstructor
@@ -44,7 +46,7 @@ public class RoomService {
         room.getMembers().add(creator);
 
         Room saved = roomRepository.save(room);
-        return mapToResponse(saved);
+        return mapToResponse(saved, null);
     }
 
     @Transactional
@@ -63,7 +65,7 @@ public class RoomService {
 
         room.getMembers().add(user);
         roomRepository.save(room);
-        return mapToResponse(room);
+        return mapToResponse(room, null);
     }
 
     @Transactional
@@ -82,7 +84,7 @@ public class RoomService {
     public List<RoomResponse> getPublicRooms() {
         return roomRepository.findByType(Room.RoomType.PUBLIC)
                 .stream()
-                .map(this::mapToResponse)
+                .map(r -> mapToResponse(r, null))
                 .toList();
     }
 
@@ -90,19 +92,45 @@ public class RoomService {
         User user = getUser(username);
         return roomRepository.findRoomsByUserId(user.getId())
                 .stream()
-                .map(this::mapToResponse)
+                .map(r -> mapToResponse(r, username))
                 .toList();
     }
 
     public List<RoomResponse> searchRooms(String query) {
         return roomRepository.findByNameContainingIgnoreCaseAndType(query, Room.RoomType.PUBLIC)
                 .stream()
-                .map(this::mapToResponse)
+                .map(r -> mapToResponse(r, null))
                 .toList();
     }
 
+    @Transactional
+    public RoomResponse getOrCreateDm(String currentUsername, String targetUsername) {
+        if (currentUsername.equals(targetUsername)) {
+            throw new RuntimeException("Cannot open a DM with yourself");
+        }
+        User current = getUser(currentUsername);
+        User target  = getUser(targetUsername);
+
+        String[] sorted = { currentUsername, targetUsername };
+        Arrays.sort(sorted);
+        String dmName = "dm:" + sorted[0] + ":" + sorted[1];
+
+        return roomRepository.findByName(dmName)
+                .map(r -> mapToResponse(r, currentUsername))
+                .orElseGet(() -> {
+                    Room dm = Room.builder()
+                            .name(dmName)
+                            .type(Room.RoomType.DIRECT)
+                            .createdBy(current)
+                            .build();
+                    dm.getMembers().add(current);
+                    dm.getMembers().add(target);
+                    return mapToResponse(roomRepository.save(dm), currentUsername);
+                });
+    }
+
     public RoomResponse getRoomById(Long roomId) {
-        return mapToResponse(getRoom(roomId));
+        return mapToResponse(getRoom(roomId), null);
     }
 
     @Transactional
@@ -122,7 +150,7 @@ public class RoomService {
             room.setDescription(newDescription.trim().isEmpty() ? null : newDescription.trim());
         }
         roomRepository.save(room);
-        return mapToResponse(room);
+        return mapToResponse(room, null);
     }
 
     @Transactional
@@ -163,15 +191,22 @@ public class RoomService {
                 .orElseThrow(() -> new RuntimeException("Room not found"));
     }
 
-    private RoomResponse mapToResponse(Room room) {
-        return RoomResponse.builder()
+    private RoomResponse mapToResponse(Room room, String currentUsername) {
+        RoomResponse.RoomResponseBuilder b = RoomResponse.builder()
                 .id(room.getId())
                 .name(room.getName())
                 .description(room.getDescription())
                 .type(room.getType())
                 .createdBy(room.getCreatedBy().getUsername())
                 .memberCount(room.getMembers().size())
-                .createdAt(room.getCreatedAt())
-                .build();
+                .createdAt(room.getCreatedAt());
+
+        if (room.getType() == Room.RoomType.DIRECT && currentUsername != null) {
+            Optional<User> other = room.getMembers().stream()
+                    .filter(m -> !m.getUsername().equals(currentUsername))
+                    .findFirst();
+            other.ifPresent(u -> b.otherUsername(u.getUsername()).otherDisplayName(u.getDisplayName()));
+        }
+        return b.build();
     }
 }

@@ -55,6 +55,6 @@ public class Room {
     private LocalDateTime createdAt;
 
     public enum RoomType {
-        PUBLIC, PRIVATE
+        PUBLIC, PRIVATE, DIRECT
     }
 }

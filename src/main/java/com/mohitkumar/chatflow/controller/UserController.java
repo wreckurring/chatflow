@@ -1,8 +1,10 @@
 package com.mohitkumar.chatflow.controller;
 
+import com.mohitkumar.chatflow.dto.RoomResponse;
 import com.mohitkumar.chatflow.dto.UserProfileResponse;
 import com.mohitkumar.chatflow.model.User;
 import com.mohitkumar.chatflow.repository.UserRepository;
+import com.mohitkumar.chatflow.service.RoomService;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.Size;
 import lombok.Data;
@@ -19,6 +21,7 @@ import java.security.Principal;
 public class UserController {
 
     private final UserRepository userRepository;
+    private final RoomService roomService;
 
     @GetMapping("/me")
     public ResponseEntity<UserProfileResponse> getCurrentUser(Principal principal) {
@@ -38,6 +41,11 @@ public class UserController {
     @GetMapping("/{username}")
     public ResponseEntity<UserProfileResponse> getUserByUsername(@PathVariable String username) {
         return ResponseEntity.ok(toResponse(getUser(username)));
+    }
+
+    @PostMapping("/{username}/dm")
+    public ResponseEntity<RoomResponse> openDm(@PathVariable String username, Principal principal) {
+        return ResponseEntity.ok(roomService.getOrCreateDm(principal.getName(), username));
     }
 
     private User getUser(String username) {

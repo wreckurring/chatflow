@@ -1,10 +1,12 @@
 import { useState, useEffect, useRef } from 'react'
 import { getMyRooms, getPublicRooms, joinRoom, searchRooms } from '../../api/rooms'
 import { getOnlinePresence } from '../../api/presence'
+import { openDm } from '../../api/users'
 import { useAuth } from '../../store/authStore'
 import { Avatar } from '../shared/Avatar'
 import { CreateRoomModal } from '../rooms/CreateRoomModal'
 import { ProfileModal } from '../shared/ProfileModal'
+import { NewDmModal } from '../shared/NewDmModal'
 
 export function Sidebar({ activeRoomId, onSelectRoom, wsConnected, unread = {}, soundEnabled = true, onToggleSound }) {
   const { user, signOut } = useAuth()
@@ -14,6 +16,7 @@ export function Sidebar({ activeRoomId, onSelectRoom, wsConnected, unread = {}, 
   const [search, setSearch] = useState('')
   const [searchResults, setSearchResults] = useState(null)
   const [showCreate, setShowCreate] = useState(false)
+  const [showNewDm, setShowNewDm]   = useState(false)
   const [joining, setJoining]       = useState(null)
   const [showProfile, setShowProfile] = useState(false)
   const searchRef = useRef(null)
@@ -71,8 +74,10 @@ export function Sidebar({ activeRoomId, onSelectRoom, wsConnected, unread = {}, 
     }
   }
 
-  const myRoomIds = new Set(myRooms.map(r => r.id))
-  const displayRooms = searchResults ?? myRooms
+  const myRoomIds   = new Set(myRooms.map(r => r.id))
+  const myChannels  = myRooms.filter(r => r.type !== 'DIRECT')
+  const myDms       = myRooms.filter(r => r.type === 'DIRECT')
+  const displayRooms = searchResults ?? myChannels
 
   return (
     <aside className="w-60 shrink-0 bg-surface-1 border-r border-border flex flex-col h-full">
@@ -159,7 +164,7 @@ export function Sidebar({ activeRoomId, onSelectRoom, wsConnected, unread = {}, 
               </button>
             </div>
 
-            {myRooms.length === 0 && (
+            {myChannels.length === 0 && !search && (
               <p className="text-xs text-ink-muted px-4 py-2">No rooms yet. Join or create one.</p>
             )}
 
@@ -170,6 +175,34 @@ export function Sidebar({ activeRoomId, onSelectRoom, wsConnected, unread = {}, 
                 active={room.id === activeRoomId}
                 joined={myRoomIds.has(room.id)}
                 joining={joining === room.id}
+                unreadCount={unread[room.id] ?? 0}
+                onSelect={() => onSelectRoom(room)}
+              />
+            ))}
+
+            {/* Direct Messages */}
+            <div className="px-3 pt-3 pb-1 flex items-center justify-between">
+              <p className="text-2xs text-ink-faint uppercase tracking-wider">Direct messages</p>
+              <button
+                onClick={() => setShowNewDm(true)}
+                className="text-ink-muted hover:text-accent transition-colors"
+                title="New DM"
+              >
+                <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5">
+                  <path d="M12 5v14M5 12h14"/>
+                </svg>
+              </button>
+            </div>
+            {myDms.length === 0 && (
+              <p className="text-xs text-ink-muted px-4 py-1">No direct messages yet.</p>
+            )}
+            {myDms.map(room => (
+              <RoomItem
+                key={room.id}
+                room={room}
+                active={room.id === activeRoomId}
+                joined={true}
+                joining={false}
                 unreadCount={unread[room.id] ?? 0}
                 onSelect={() => onSelectRoom(room)}
               />
@@ -246,12 +279,20 @@ export function Sidebar({ activeRoomId, onSelectRoom, wsConnected, unread = {}, 
       {showProfile && (
         <ProfileModal onClose={() => setShowProfile(false)} />
       )}
+      {showNewDm && (
+        <NewDmModal
+          onClose={() => setShowNewDm(false)}
+          onOpen={(room) => { loadRooms(); onSelectRoom(room); setShowNewDm(false) }}
+        />
+      )}
     </aside>
   )
 }
 
 function RoomItem({ room, active, joined, joining, unreadCount = 0, onSelect }) {
   const hasUnread = unreadCount > 0 && !active
+  const isDm      = room.type === 'DIRECT'
+  const label     = isDm ? (room.otherDisplayName || room.otherUsername || room.name) : room.name
 
   return (
     <button
@@ -266,10 +307,18 @@ function RoomItem({ room, active, joined, joining, unreadCount = 0, onSelect }) 
       }`}
       style={{ width: 'calc(100% - 8px)' }}
     >
-      <span className={`text-base leading-none w-5 shrink-0 text-center ${active ? 'text-accent' : hasUnread ? 'text-accent-text' : 'text-ink-faint group-hover:text-ink-muted'}`}>
-        #
-      </span>
-      <span className={`flex-1 text-xs truncate ${hasUnread ? 'font-semibold' : 'font-medium'}`}>{room.name}</span>
+      {isDm ? (
+        <span className={`w-5 shrink-0 flex items-center justify-center ${active ? 'text-accent' : hasUnread ? 'text-ink' : 'text-ink-faint group-hover:text-ink-muted'}`}>
+          <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+            <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/>
+          </svg>
+        </span>
+      ) : (
+        <span className={`text-base leading-none w-5 shrink-0 text-center ${active ? 'text-accent' : hasUnread ? 'text-accent-text' : 'text-ink-faint group-hover:text-ink-muted'}`}>
+          #
+        </span>
+      )}
+      <span className={`flex-1 text-xs truncate ${hasUnread ? 'font-semibold' : 'font-medium'}`}>{label}</span>
       {hasUnread && (
         <span className="text-2xs font-semibold bg-accent text-surface rounded-full min-w-[16px] h-4 flex items-center justify-center px-1">
           {unreadCount > 99 ? '99+' : unreadCount}

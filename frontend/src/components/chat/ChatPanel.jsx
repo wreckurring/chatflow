@@ -7,6 +7,7 @@ import { TypingIndicator } from './TypingIndicator'
 import { MembersPanel } from './MembersPanel'
 import { SearchPanel } from './SearchPanel'
 import { MentionDropdown, detectMentionTrigger } from './MentionDropdown'
+import { openDm } from '../../api/users'
 import { RoomSettingsModal } from '../rooms/RoomSettingsModal'
 import { Button } from '../shared/Button'
 import { useAutoResize } from '../../hooks/useAutoResize'
@@ -23,7 +24,7 @@ function isSameSender(a, b) {
   return a && b && a.senderUsername === b.senderUsername && a.type !== 'SYSTEM' && b.type !== 'SYSTEM'
 }
 
-export function ChatPanel({ room, ws, onMessageRef, onTypingRef, onLeave, onToggleSidebar, onRoomUpdated, onRoomDeleted }) {
+export function ChatPanel({ room, ws, onMessageRef, onTypingRef, onLeave, onToggleSidebar, onRoomUpdated, onRoomDeleted, onSelectRoom }) {
   const { user } = useAuth()
   const [messages, setMessages]       = useState([])
   const [input, setInput]             = useState('')
@@ -255,8 +256,12 @@ export function ChatPanel({ room, ws, onMessageRef, onTypingRef, onLeave, onTogg
                 <path d="M3 12h18M3 6h18M3 18h18"/>
               </svg>
             </button>
-            <span className="text-ink-muted font-mono text-sm shrink-0">#</span>
-            <h1 className="text-sm font-semibold text-ink">{room.name}</h1>
+            {room.type !== 'DIRECT' && <span className="text-ink-muted font-mono text-sm shrink-0">#</span>}
+            <h1 className="text-sm font-semibold text-ink">
+              {room.type === 'DIRECT'
+                ? (room.otherDisplayName || room.otherUsername || room.name)
+                : room.name}
+            </h1>
             {room.description && (
               <>
                 <span className="text-border-strong shrink-0 hidden sm:inline">·</span>
@@ -298,12 +303,14 @@ export function ChatPanel({ room, ws, onMessageRef, onTypingRef, onLeave, onTogg
                 </svg>
               </button>
             )}
-            <button
-              onClick={handleLeave}
-              className="text-xs text-ink-faint hover:text-danger transition-colors px-2 py-1 rounded hover:bg-danger-subtle"
-            >
-              leave
-            </button>
+            {room.type !== 'DIRECT' && (
+              <button
+                onClick={handleLeave}
+                className="text-xs text-ink-faint hover:text-danger transition-colors px-2 py-1 rounded hover:bg-danger-subtle"
+              >
+                leave
+              </button>
+            )}
           </div>
         </header>
 
@@ -400,7 +407,9 @@ export function ChatPanel({ room, ws, onMessageRef, onTypingRef, onLeave, onTogg
               value={input}
               onChange={handleInputChange}
               onKeyDown={handleKeyDown}
-              placeholder={`Message #${room.name}`}
+              placeholder={room.type === 'DIRECT'
+                ? `Message ${room.otherDisplayName || room.otherUsername || ''}`
+                : `Message #${room.name}`}
               rows={1}
               className="flex-1 bg-transparent text-sm text-ink placeholder-ink-faint font-mono resize-none focus:outline-none leading-relaxed overflow-hidden"
               style={{ minHeight: '1.5rem', maxHeight: '8rem' }}
@@ -417,7 +426,17 @@ export function ChatPanel({ room, ws, onMessageRef, onTypingRef, onLeave, onTogg
       </div>{/* end flex-col */}
 
       {showMembers && (
-        <MembersPanel roomId={room.id} onClose={() => setShowMembers(false)} />
+        <MembersPanel
+          roomId={room.id}
+          onClose={() => setShowMembers(false)}
+          onOpenDm={async (username) => {
+            try {
+              const dmRoom = await openDm(username)
+              onSelectRoom?.(dmRoom)
+            } catch {}
+            setShowMembers(false)
+          }}
+        />
       )}
 
       {showSearch && (

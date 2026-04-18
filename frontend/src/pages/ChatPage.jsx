@@ -78,7 +78,10 @@ export function ChatPage() {
     onMessageRef.current?.(msg)
     if (msg.type !== 'SYSTEM' && !msg.eventType && msg.roomId !== activeRoomId.current) {
       setUnread(prev => ({ ...prev, [msg.roomId]: (prev[msg.roomId] ?? 0) + 1 }))
-      const roomName = roomsRef.current[msg.roomId]?.name ?? `room ${msg.roomId}`
+      const r = roomsRef.current[msg.roomId]
+      const roomName = r?.type === 'DIRECT'
+        ? (r.otherDisplayName || r.otherUsername || r.name)
+        : (r?.name ?? `room ${msg.roomId}`)
       notify(msg, roomName)
     }
   }, [notify])
@@ -152,6 +155,7 @@ export function ChatPage() {
             onToggleSidebar={() => setSidebarOpen(v => !v)}
             onRoomUpdated={handleRoomUpdated}
             onRoomDeleted={handleRoomDeleted}
+            onSelectRoom={(room) => { handleSelectRoom(room); setSidebarKey(k => k + 1) }}
           />
         ) : (
           <EmptyState onToggleSidebar={() => setSidebarOpen(v => !v)} />
