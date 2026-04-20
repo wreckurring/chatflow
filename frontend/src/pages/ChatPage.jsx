@@ -5,6 +5,7 @@ import { EmptyState } from '../components/chat/EmptyState'
 import { KeyboardShortcutsModal } from '../components/shared/KeyboardShortcutsModal'
 import { useWebSocket } from '../hooks/useWebSocket'
 import { useNotifications } from '../hooks/useNotifications'
+import { usePresence } from '../hooks/usePresence'
 import { useAuth } from '../store/authStore'
 
 function ReconnectBanner({ connected, wasConnected }) {
@@ -89,6 +90,7 @@ export function ChatPage() {
   const handleTyping = useCallback((evt) => onTypingRef.current?.(evt), [])
 
   const ws = useWebSocket({ token, onMessage: handleMessage, onTyping: handleTyping })
+  const { isOnline } = usePresence(ws)
 
   // Track wasConnected for reconnect banner
   useEffect(() => {
@@ -140,6 +142,7 @@ export function ChatPage() {
           unread={unread}
           soundEnabled={soundEnabled}
           onToggleSound={toggleSound}
+          isOnline={isOnline}
         />
       </div>
 
@@ -156,6 +159,7 @@ export function ChatPage() {
             onRoomUpdated={handleRoomUpdated}
             onRoomDeleted={handleRoomDeleted}
             onSelectRoom={(room) => { handleSelectRoom(room); setSidebarKey(k => k + 1) }}
+            isOnline={isOnline}
           />
         ) : (
           <EmptyState onToggleSidebar={() => setSidebarOpen(v => !v)} />

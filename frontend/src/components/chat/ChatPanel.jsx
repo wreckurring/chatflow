@@ -25,7 +25,7 @@ function isSameSender(a, b) {
   return a && b && a.senderUsername === b.senderUsername && a.type !== 'SYSTEM' && b.type !== 'SYSTEM'
 }
 
-export function ChatPanel({ room, ws, onMessageRef, onTypingRef, onLeave, onToggleSidebar, onRoomUpdated, onRoomDeleted, onSelectRoom }) {
+export function ChatPanel({ room, ws, onMessageRef, onTypingRef, onLeave, onToggleSidebar, onRoomUpdated, onRoomDeleted, onSelectRoom, isOnline }) {
   const { user } = useAuth()
   const [messages, setMessages]       = useState([])
   const [input, setInput]             = useState('')
@@ -446,6 +446,7 @@ export function ChatPanel({ room, ws, onMessageRef, onTypingRef, onLeave, onTogg
       {showMembers && (
         <MembersPanel
           roomId={room.id}
+          isOnline={isOnline}
           onClose={() => setShowMembers(false)}
           onOpenDm={async (username) => {
             try {

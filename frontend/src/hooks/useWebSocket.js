@@ -115,5 +115,14 @@ export function useWebSocket({ token, onMessage, onTyping }) {
     })
   }, [])
 
-  return { joinRoom, leaveRoom, sendMessage, sendTyping, connected }
+  const subscribe = useCallback((destination, callback) => {
+    const client = clientRef.current
+    if (!client?.connected) return () => {}
+    const sub = client.subscribe(destination, (frame) => {
+      try { callback(JSON.parse(frame.body)) } catch {}
+    })
+    return () => sub?.unsubscribe()
+  }, [])
+
+  return { joinRoom, leaveRoom, sendMessage, sendTyping, connected, subscribe }
 }

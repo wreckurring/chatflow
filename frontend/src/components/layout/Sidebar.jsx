@@ -8,7 +8,7 @@ import { CreateRoomModal } from '../rooms/CreateRoomModal'
 import { ProfileModal } from '../shared/ProfileModal'
 import { NewDmModal } from '../shared/NewDmModal'
 
-export function Sidebar({ activeRoomId, onSelectRoom, wsConnected, unread = {}, soundEnabled = true, onToggleSound }) {
+export function Sidebar({ activeRoomId, onSelectRoom, wsConnected, unread = {}, soundEnabled = true, onToggleSound, isOnline }) {
   const { user, signOut } = useAuth()
   const [myRooms, setMyRooms] = useState([])
   const [publicRooms, setPublicRooms] = useState([])
@@ -205,6 +205,7 @@ export function Sidebar({ activeRoomId, onSelectRoom, wsConnected, unread = {}, 
                 joining={false}
                 unreadCount={unread[room.id] ?? 0}
                 onSelect={() => onSelectRoom(room)}
+                online={isOnline?.(room.otherUsername)}
               />
             ))}
 
@@ -289,7 +290,7 @@ export function Sidebar({ activeRoomId, onSelectRoom, wsConnected, unread = {}, 
   )
 }
 
-function RoomItem({ room, active, joined, joining, unreadCount = 0, onSelect }) {
+function RoomItem({ room, active, joined, joining, unreadCount = 0, onSelect, online }) {
   const hasUnread = unreadCount > 0 && !active
   const isDm      = room.type === 'DIRECT'
   const label     = isDm ? (room.otherDisplayName || room.otherUsername || room.name) : room.name
@@ -308,10 +309,12 @@ function RoomItem({ room, active, joined, joining, unreadCount = 0, onSelect }) 
       style={{ width: 'calc(100% - 8px)' }}
     >
       {isDm ? (
-        <span className={`w-5 shrink-0 flex items-center justify-center ${active ? 'text-accent' : hasUnread ? 'text-ink' : 'text-ink-faint group-hover:text-ink-muted'}`}>
-          <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+        <span className="relative w-5 shrink-0 flex items-center justify-center">
+          <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"
+            className={active ? 'text-accent' : hasUnread ? 'text-ink' : 'text-ink-faint group-hover:text-ink-muted'}>
             <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/>
           </svg>
+          {online && <span className="absolute -bottom-0.5 -right-0.5 w-2 h-2 rounded-full bg-accent border border-surface-1" />}
         </span>
       ) : (
         <span className={`text-base leading-none w-5 shrink-0 text-center ${active ? 'text-accent' : hasUnread ? 'text-accent-text' : 'text-ink-faint group-hover:text-ink-muted'}`}>

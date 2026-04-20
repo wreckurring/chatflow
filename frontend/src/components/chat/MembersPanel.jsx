@@ -1,28 +1,22 @@
 import { useState, useEffect } from 'react'
 import { getRoomMembers } from '../../api/rooms'
-import { getOnlinePresence } from '../../api/presence'
-import { openDm } from '../../api/users'
 import { useAuth } from '../../store/authStore'
 import { Avatar } from '../shared/Avatar'
 
-export function MembersPanel({ roomId, onClose, onOpenDm }) {
+export function MembersPanel({ roomId, onClose, onOpenDm, isOnline }) {
   const { user } = useAuth()
   const [members, setMembers] = useState([])
-  const [onlineSet, setOnlineSet] = useState(new Set())
   const [loading, setLoading] = useState(true)
 
   useEffect(() => {
-    Promise.all([getRoomMembers(roomId), getOnlinePresence()])
-      .then(([m, presence]) => {
-        setMembers(m)
-        setOnlineSet(new Set(presence.users ?? []))
-      })
+    getRoomMembers(roomId)
+      .then(setMembers)
       .catch(() => {})
       .finally(() => setLoading(false))
   }, [roomId])
 
-  const online  = members.filter(m => onlineSet.has(m.username))
-  const offline = members.filter(m => !onlineSet.has(m.username))
+  const online  = members.filter(m => isOnline?.(m.username))
+  const offline = members.filter(m => !isOnline?.(m.username))
 
   return (
     <aside className="w-52 shrink-0 border-l border-border bg-surface-1 flex flex-col h-full animate-fade-in">
@@ -48,19 +42,29 @@ export function MembersPanel({ roomId, onClose, onOpenDm }) {
           <>
             {online.length > 0 && (
               <>
-                <p className="text-2xs text-ink-faint uppercase tracking-wider mb-1.5">
-                  Online — {online.length}
-                </p>
-                {online.map(m => <MemberRow key={m.id} member={m} online onDm={m.username !== user?.username ? () => onOpenDm?.(m.username) : null} />)}
+                <p className="text-2xs text-ink-faint uppercase tracking-wider mb-1.5">Online — {online.length}</p>
+                {online.map(m => (
+                  <MemberRow
+                    key={m.id}
+                    member={m}
+                    online
+                    onDm={m.username !== user?.username ? () => onOpenDm?.(m.username) : null}
+                  />
+                ))}
                 <div className="my-3" />
               </>
             )}
             {offline.length > 0 && (
               <>
-                <p className="text-2xs text-ink-faint uppercase tracking-wider mb-1.5">
-                  Offline — {offline.length}
-                </p>
-                {offline.map(m => <MemberRow key={m.id} member={m} online={false} onDm={m.username !== user?.username ? () => onOpenDm?.(m.username) : null} />)}
+                <p className="text-2xs text-ink-faint uppercase tracking-wider mb-1.5">Offline — {offline.length}</p>
+                {offline.map(m => (
+                  <MemberRow
+                    key={m.id}
+                    member={m}
+                    online={false}
+                    onDm={m.username !== user?.username ? () => onOpenDm?.(m.username) : null}
+                  />
+                ))}
               </>
             )}
           </>
