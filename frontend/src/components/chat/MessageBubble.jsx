@@ -3,6 +3,32 @@ import { Avatar } from '../shared/Avatar'
 import { editMessage, deleteMessage, toggleReaction } from '../../api/messages'
 import { togglePin } from '../../api/rooms'
 import { toast } from '../shared/Toast'
+import hljs from 'highlight.js/lib/core'
+import javascript from 'highlight.js/lib/languages/javascript'
+import python from 'highlight.js/lib/languages/python'
+import java from 'highlight.js/lib/languages/java'
+import bash from 'highlight.js/lib/languages/bash'
+import sql from 'highlight.js/lib/languages/sql'
+import json from 'highlight.js/lib/languages/json'
+import xml from 'highlight.js/lib/languages/xml'
+import css from 'highlight.js/lib/languages/css'
+import typescript from 'highlight.js/lib/languages/typescript'
+import 'highlight.js/styles/atom-one-dark.css'
+
+hljs.registerLanguage('javascript', javascript)
+hljs.registerLanguage('js', javascript)
+hljs.registerLanguage('typescript', typescript)
+hljs.registerLanguage('ts', typescript)
+hljs.registerLanguage('python', python)
+hljs.registerLanguage('py', python)
+hljs.registerLanguage('java', java)
+hljs.registerLanguage('bash', bash)
+hljs.registerLanguage('sh', bash)
+hljs.registerLanguage('sql', sql)
+hljs.registerLanguage('json', json)
+hljs.registerLanguage('xml', xml)
+hljs.registerLanguage('html', xml)
+hljs.registerLanguage('css', css)
 
 function formatTime(ts) {
   if (!ts) return ''
@@ -124,15 +150,38 @@ function CopyButton({ text }) {
   )
 }
 
+function CodeBlock({ lang, code }) {
+  const ref = useRef(null)
+  useEffect(() => {
+    if (!ref.current) return
+    if (lang && hljs.getLanguage(lang)) {
+      ref.current.innerHTML = hljs.highlight(code, { language: lang }).value
+    } else {
+      ref.current.innerHTML = hljs.highlightAuto(code).value
+    }
+  }, [lang, code])
+
+  return (
+    <div className="mt-1.5 mb-0.5 rounded border border-border overflow-hidden text-xs">
+      {lang && (
+        <div className="px-3 py-1 bg-surface-3 border-b border-border text-2xs text-ink-faint font-mono">{lang}</div>
+      )}
+      <pre className="px-3 py-2 overflow-x-auto leading-relaxed" style={{ background: '#1a1b1e', margin: 0 }}>
+        <code ref={ref} className="font-mono" />
+      </pre>
+    </div>
+  )
+}
+
 // Markdown + code rendering
 function MessageContent({ text, currentUsername }) {
   const parts = []
-  const blockRe = /```([\s\S]*?)```/g
+  const blockRe = /```(\w*)\n?([\s\S]*?)```/g
   let last = 0, match
 
   while ((match = blockRe.exec(text)) !== null) {
     if (match.index > last) parts.push({ type: 'text', value: text.slice(last, match.index) })
-    parts.push({ type: 'block', value: match[1].replace(/^\n/, '').replace(/\n$/, '') })
+    parts.push({ type: 'block', lang: match[1] || '', code: match[2].replace(/\n$/, '') })
     last = match.index + match[0].length
   }
   if (last < text.length) parts.push({ type: 'text', value: text.slice(last) })
@@ -141,11 +190,7 @@ function MessageContent({ text, currentUsername }) {
     <>
       {parts.map((part, i) => {
         if (part.type === 'block') {
-          return (
-            <pre key={i} className="mt-1.5 mb-0.5 px-3 py-2 bg-surface rounded border border-border text-xs font-mono leading-relaxed overflow-x-auto whitespace-pre">
-              {part.value}
-            </pre>
-          )
+          return <CodeBlock key={i} lang={part.lang} code={part.code} />
         }
         return <InlineMarkdown key={i} text={part.value} currentUsername={currentUsername} />
       })}

@@ -24,4 +24,7 @@ public class RoomResponse {
     // Populated only for DIRECT rooms — the other participant
     private String otherUsername;
     private String otherDisplayName;
+    // Last activity preview for sidebar
+    private String lastMessagePreview;
+    private LocalDateTime lastMessageAt;
 }

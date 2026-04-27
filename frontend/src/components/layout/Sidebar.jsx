@@ -290,16 +290,28 @@ export function Sidebar({ activeRoomId, onSelectRoom, wsConnected, unread = {}, 
   )
 }
 
+function timeAgo(ts) {
+  if (!ts) return ''
+  const diff = Date.now() - new Date(ts).getTime()
+  const m = Math.floor(diff / 60000)
+  if (m < 1) return 'now'
+  if (m < 60) return `${m}m`
+  const h = Math.floor(m / 60)
+  if (h < 24) return `${h}h`
+  return `${Math.floor(h / 24)}d`
+}
+
 function RoomItem({ room, active, joined, joining, unreadCount = 0, onSelect, online }) {
   const hasUnread = unreadCount > 0 && !active
   const isDm      = room.type === 'DIRECT'
   const label     = isDm ? (room.otherDisplayName || room.otherUsername || room.name) : room.name
+  const hasPreview = !!room.lastMessagePreview
 
   return (
     <button
       onClick={onSelect}
       disabled={joining}
-      className={`w-full flex items-center gap-2.5 px-3 py-2 rounded-md mx-1 text-left transition-colors group ${
+      className={`w-full flex items-center gap-2.5 px-3 py-1.5 rounded-md mx-1 text-left transition-colors group ${
         active
           ? 'bg-accent-subtle text-ink'
           : hasUnread
@@ -321,19 +333,35 @@ function RoomItem({ room, active, joined, joining, unreadCount = 0, onSelect, on
           #
         </span>
       )}
-      <span className={`flex-1 text-xs truncate ${hasUnread ? 'font-semibold' : 'font-medium'}`}>{label}</span>
-      {hasUnread && (
-        <span className="text-2xs font-semibold bg-accent text-surface rounded-full min-w-[16px] h-4 flex items-center justify-center px-1">
-          {unreadCount > 99 ? '99+' : unreadCount}
+
+      <span className="flex-1 min-w-0 flex flex-col">
+        <span className="flex items-center justify-between gap-1">
+          <span className={`text-xs truncate ${hasUnread ? 'font-semibold' : 'font-medium'}`}>{label}</span>
+          <span className="flex items-center gap-1 shrink-0">
+            {room.lastMessageAt && (
+              <span className="text-2xs text-ink-faint">{timeAgo(room.lastMessageAt)}</span>
+            )}
+            {hasUnread && (
+              <span className="text-2xs font-semibold bg-accent text-surface rounded-full min-w-[16px] h-4 flex items-center justify-center px-1">
+                {unreadCount > 99 ? '99+' : unreadCount}
+              </span>
+            )}
+          </span>
         </span>
-      )}
-      {!joined && !hasUnread && (
-        <span className="text-2xs text-ink-faint bg-surface-4 px-1 py-0.5 rounded">
+        {hasPreview && (
+          <span className={`text-2xs truncate ${hasUnread ? 'text-ink-muted' : 'text-ink-faint'}`}>
+            {room.lastMessagePreview}
+          </span>
+        )}
+      </span>
+
+      {!joined && (
+        <span className="text-2xs text-ink-faint bg-surface-4 px-1 py-0.5 rounded shrink-0">
           {joining ? '…' : 'join'}
         </span>
       )}
       {room.type === 'PRIVATE' && (
-        <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className="text-ink-faint">
+        <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className="text-ink-faint shrink-0">
           <rect x="3" y="11" width="18" height="11" rx="2" ry="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/>
         </svg>
       )}

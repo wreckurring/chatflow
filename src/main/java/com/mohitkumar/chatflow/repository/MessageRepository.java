@@ -9,11 +9,14 @@ import org.springframework.data.repository.query.Param;
 import org.springframework.stereotype.Repository;
 
 import java.util.List;
+import java.util.Optional;
 
 @Repository
 public interface MessageRepository extends JpaRepository<Message, Long> {
 
     Page<Message> findByRoomIdAndDeletedFalseOrderBySentAtDesc(Long roomId, Pageable pageable);
+
+    Optional<Message> findFirstByRoomIdAndDeletedFalseOrderBySentAtDesc(Long roomId);
 
     void deleteByRoomId(Long roomId);
 

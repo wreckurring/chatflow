@@ -31,6 +31,7 @@ public class RoomService {
     private final MessageRepository messageRepository;
     private final ReactionRepository reactionRepository;
     private final PinnedMessageRepository pinnedMessageRepository;
+    private final com.mohitkumar.chatflow.repository.RoomInviteRepository roomInviteRepository;
 
     @Transactional
     public RoomResponse createRoom(CreateRoomRequest request, String username) {
@@ -164,6 +165,7 @@ public class RoomService {
         if (!room.getCreatedBy().getUsername().equals(username)) {
             throw new RuntimeException("Only the room owner can delete this room");
         }
+        roomInviteRepository.deleteByRoomId(roomId);
         pinnedMessageRepository.deleteByRoomId(roomId);
         reactionRepository.deleteByRoomId(roomId);
         messageRepository.deleteByRoomId(roomId);
@@ -238,7 +240,7 @@ public class RoomService {
                 .orElseThrow(() -> new RuntimeException("User not found: " + username));
     }
 
-    private Room getRoom(Long roomId) {
+    Room getRoom(Long roomId) {
         return roomRepository.findById(roomId)
                 .orElseThrow(() -> new RuntimeException("Room not found"));
     }
@@ -259,6 +261,14 @@ public class RoomService {
                     .findFirst();
             other.ifPresent(u -> b.otherUsername(u.getUsername()).otherDisplayName(u.getDisplayName()));
         }
+
+        messageRepository.findFirstByRoomIdAndDeletedFalseOrderBySentAtDesc(room.getId())
+                .ifPresent(msg -> {
+                    String preview = msg.getContent() != null ? msg.getContent() : "(attachment)";
+                    if (preview.length() > 80) preview = preview.substring(0, 80) + "…";
+                    b.lastMessagePreview(preview).lastMessageAt(msg.getSentAt());
+                });
+
         return b.build();
     }
 }

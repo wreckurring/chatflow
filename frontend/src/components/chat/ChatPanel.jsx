@@ -43,6 +43,8 @@ export function ChatPanel({ room, ws, onMessageRef, onTypingRef, onLeave, onTogg
   const [members, setMembers]         = useState([])
   const [mention, setMention]         = useState(null)   // { query, start, end }
   const [mentionIdx, setMentionIdx]   = useState(0)
+  const [atBottom, setAtBottom]       = useState(true)
+  const [newMsgCount, setNewMsgCount] = useState(0)
 
   const isOwner = room.createdBy === user?.username
 
@@ -71,6 +73,7 @@ export function ChatPanel({ room, ws, onMessageRef, onTypingRef, onLeave, onTogg
         setPinCount(prev => msg.pinned ? prev + 1 : Math.max(0, prev - 1))
       } else {
         setMessages(prev => [...prev, msg])
+        if (!isNearBottom.current) setNewMsgCount(c => c + 1)
       }
     }
     onTypingRef.current = (event) => {
@@ -103,6 +106,8 @@ export function ChatPanel({ room, ws, onMessageRef, onTypingRef, onLeave, onTogg
     setHasMore(true)
     setPage(0)
     setInput('')
+    setAtBottom(true)
+    setNewMsgCount(0)
 
     getRoomHistory(room.id, 0, PAGE_SIZE)
       .then(history => {
@@ -121,9 +126,11 @@ export function ChatPanel({ room, ws, onMessageRef, onTypingRef, onLeave, onTogg
   const handleScroll = useCallback(() => {
     const el = scrollRef.current
     if (!el) return
-    isNearBottom.current = el.scrollHeight - el.scrollTop - el.clientHeight < 80
+    const near = el.scrollHeight - el.scrollTop - el.clientHeight < 80
+    isNearBottom.current = near
+    setAtBottom(near)
+    if (near) setNewMsgCount(0)
 
-    // Trigger load-more when within 120px of the top
     if (el.scrollTop < 120 && hasMore && !loadingMore && !loadingHistory) {
       loadOlderMessages()
     }
@@ -242,6 +249,11 @@ export function ChatPanel({ room, ws, onMessageRef, onTypingRef, onLeave, onTogg
       if (e.key === 'Escape') { setMention(null); return }
     }
     if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); handleSend() }
+  }
+
+  const scrollToBottom = () => {
+    bottomRef.current?.scrollIntoView({ behavior: 'smooth' })
+    setNewMsgCount(0)
   }
 
   const handleLeave = async () => {
@@ -385,6 +397,26 @@ export function ChatPanel({ room, ws, onMessageRef, onTypingRef, onLeave, onTogg
             </>
           )}
         </div>
+
+        {/* Scroll-to-bottom FAB */}
+        {!atBottom && (
+          <div className="flex justify-center pb-1 shrink-0">
+            <button
+              onClick={scrollToBottom}
+              className="flex items-center gap-1.5 px-3 py-1 text-xs bg-surface-3 border border-border rounded-full text-ink-muted hover:text-ink hover:border-border-strong transition-colors shadow-md"
+            >
+              {newMsgCount > 0 && (
+                <span className="text-2xs font-semibold bg-accent text-surface rounded-full px-1.5 py-0.5 leading-none">
+                  {newMsgCount}
+                </span>
+              )}
+              <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5">
+                <path d="M12 5v14M5 12l7 7 7-7"/>
+              </svg>
+              <span>scroll to bottom</span>
+            </button>
+          </div>
+        )}
 
         {/* Typing indicator */}
         <TypingIndicator typists={typists} />
